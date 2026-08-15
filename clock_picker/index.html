@@ -4,14 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: transparent; }
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 10px; background: transparent; color: #f6f2ff; overflow: hidden; }
-    .picker { display: flex; flex-direction: column; gap: 17px; align-items: center; padding: 24px 28px 22px;
-      border:1px solid rgba(255,255,255,.14); border-radius:30px;
-      background:linear-gradient(145deg,rgba(84,66,129,.34),rgba(19,17,38,.72));
-      box-shadow:0 25px 75px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.13);
-      backdrop-filter:blur(28px); }
+    html, body { background: transparent !important; }
+    body { margin: 0; padding: 10px; color: #f6f2ff; overflow: hidden; }
+    .picker { display: flex; flex-direction: column; gap: 17px; align-items: center; padding: 14px 28px 12px;
+      border:0; border-radius:0; background:transparent; box-shadow:none; backdrop-filter:none; }
     .dial {
       position: relative; width: 330px; height: 330px; border-radius: 50%; cursor: pointer;
       background: radial-gradient(circle at 48% 38%, #342956 0 46%, #151127 73%);
