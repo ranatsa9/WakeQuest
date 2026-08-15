@@ -651,7 +651,14 @@ ctx = webrtc_streamer(
     key=f"wakequest-{mission}-{key}",
     mode=WebRtcMode.SENDRECV,
     rtc_configuration=RTC_CONFIGURATION,
-    media_stream_constraints={"video": True, "audio": False},
+    media_stream_constraints={
+        "video": {
+            "width": {"ideal": 1280, "min": 640},
+            "height": {"ideal": 720, "min": 480},
+            "frameRate": {"ideal": 24, "max": 30},
+        },
+        "audio": False,
+    },
     video_processor_factory=processor_factory,
     async_processing=True,
 )
