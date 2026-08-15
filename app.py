@@ -448,7 +448,7 @@ st.markdown("""
 [data-testid="stSidebar"] { background:rgba(9,8,23,.96); border-right:1px solid rgba(255,255,255,.08); }
 [data-testid="stSidebar"] > div { padding-top:1.25rem; }
 h1,h2,h3 { font-family:'Space Grotesk',sans-serif !important; letter-spacing:-.025em; }
-.block-container { max-width:1120px; padding-top:1.5rem; padding-bottom:3rem; }
+.block-container { max-width:1120px; padding-top:4.5rem; padding-bottom:3rem; }
 .wake-hero { position:relative; overflow:hidden; padding:1.5rem 1.8rem; border:1px solid rgba(255,255,255,.10);
   border-radius:26px; background:linear-gradient(120deg,rgba(169,130,255,.11),rgba(255,255,255,.025));
   box-shadow:0 25px 80px rgba(0,0,0,.32); backdrop-filter:blur(22px); margin-bottom:1.25rem; }
@@ -457,9 +457,10 @@ h1,h2,h3 { font-family:'Space Grotesk',sans-serif !important; letter-spacing:-.0
   font-weight:700; margin:.45rem 0 .6rem; letter-spacing:-.06em; }
 .wake-title span { background:linear-gradient(90deg,var(--cyan),#b9a6ff); -webkit-background-clip:text; color:transparent; }
 .wake-sub { color:#aebbd1; max-width:650px; font-size:1.02rem; }
-.alarm-stage { padding:1.35rem; border:1px solid rgba(255,255,255,.09); border-radius:26px;
+.alarm-stage { min-height:356px; padding:1.25rem; display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,.09); border-radius:26px;
   background:linear-gradient(145deg,rgba(255,255,255,.075),rgba(255,255,255,.025)); box-shadow:0 22px 65px rgba(0,0,0,.28); }
-.clock-shell { width:min(290px,80vw); aspect-ratio:1; margin:.3rem auto 1rem; border-radius:50%; padding:12px;
+.clock-shell { width:min(290px,calc(100% - 1rem)); aspect-ratio:1; margin:0 auto; flex:0 0 auto; border-radius:50%; padding:12px;
   background:conic-gradient(from 210deg,#6ee7ff,#ad7cff,#f2a8ff,#6ee7ff); box-shadow:0 0 55px rgba(165,116,255,.27); }
 .clock-face { height:100%; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center;
   background:radial-gradient(circle at 45% 32%,#29234d,#0c0b1c 72%); border:1px solid rgba(255,255,255,.18); }
@@ -484,7 +485,13 @@ div[data-testid="stButton"] button[kind="primary"] { background:linear-gradient(
 div[data-testid="stSelectbox"] > div > div, div[data-testid="stNumberInput"] > div > div { border-radius:13px; }
 [data-testid="stAlert"] { border-radius:16px; }
 video { border-radius:22px !important; border:1px solid rgba(255,255,255,.12); box-shadow:0 24px 70px rgba(0,0,0,.35); }
-@media(max-width:800px){ .mission-grid{grid-template-columns:repeat(2,1fr)} .wake-hero{padding:1.3rem} .clock-shell{width:230px} }
+@media(max-width:800px){
+  .block-container{padding-top:4.25rem}
+  .mission-grid{grid-template-columns:repeat(2,1fr)}
+  .wake-hero{padding:1.3rem}
+  .alarm-stage{min-height:300px}
+  .clock-shell{width:min(255px,calc(100% - .5rem))}
+}
 </style>
 <section class="wake-hero">
   <div class="wake-kicker">WakeQuest · Computer vision alarm</div>
