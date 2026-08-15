@@ -1,28 +1,70 @@
-# WakeQuest — advanced four-mission alarm
+# 🌙 WakeQuest
 
-WakeQuest is a Streamlit alarm that can be dismissed only after completing one
-of four live computer-vision missions.
+### An alarm you cannot snooze—you have to prove you are awake.
 
-## Missions
+WakeQuest is a computer-vision alarm built with Streamlit. Set a time, choose a
+challenge, and when the alarm rings, complete the live camera mission to make it
+stop. No sleepy button tapping allowed. 😴➡️😎
 
-1. **Math Gesture** — solve a multiple-choice equation and show 1–4 fingers.
-2. **Squat Sprint** — complete a random squat goal verified using YOLO pose.
-3. **Object Hunt** — show Book, Bottle, or Phone using the team's `best.pt`.
-4. **Blink Check** — complete a blink goal using MediaPipe eye crops and the
-   team's Keras eye classifier.
+> **Wake up. Prove it. Start your day.**
 
-## Start on Windows
+## ✨ What makes it different?
 
-Double-click `setup_and_run.bat`, or run it from PowerShell:
+WakeQuest combines a 12-hour alarm interface with four interactive missions.
+Each mission uses live webcam input and a different computer-vision technique.
 
-```powershell
-.\setup_and_run.bat
+| Mission | Your quest | Computer vision |
+|---|---|---|
+| ✋ **Math Gesture** | Solve a multiple-choice equation and show option 1–4 with your hand | MediaPipe Hands + geometric finger detection |
+| 🏋️ **Squat Sprint** | Complete the requested number of squats | YOLO pose estimation + knee-angle tracking |
+| 🔎 **Object Hunt** | Find and show the requested everyday object | Team-trained YOLO object detector |
+| 👁️ **Blink Check** | Blink the requested number of times | MediaPipe face landmarks + MobileNetV2 eye classifier |
+
+## 🎮 How it works
+
+1. Choose an hour, minute, and **AM/PM**.
+2. Select one of the four WakeQuest missions.
+3. Press **Set alarm** and keep the browser page open.
+4. When the alarm starts, allow camera access.
+5. Complete the mission to silence the alarm. 🎉
+
+You can also press **Test mission** to launch a challenge immediately.
+
+## 🧠 Under the hood
+
+```text
+Browser camera
+      │
+      ▼
+streamlit-webrtc
+      │
+      ├── MediaPipe Hands ─────► Math option
+      ├── YOLO Pose ───────────► Squat count
+      ├── Custom YOLO model ───► Object match
+      └── MediaPipe + CNN ─────► Blink count
+                                  │
+                                  ▼
+                           Mission complete
+                                  │
+                                  ▼
+                            Alarm silenced
 ```
 
-It creates a local virtual environment, installs the dependencies, and opens
-the app at `http://localhost:8501`. Grant camera and audio permissions.
+The models are loaded only when their mission needs them. Camera frames are
+processed through the browser with `streamlit-webrtc`, so a deployed app uses
+the user's camera rather than the server's camera.
 
-Manual alternative:
+## 🚀 Run locally
+
+### Quick start on Windows
+
+Double-click:
+
+```text
+setup_and_run.bat
+```
+
+Or run these commands in PowerShell:
 
 ```powershell
 python -m venv .venv
@@ -30,28 +72,64 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-## Eye-model calibration
+Then open `http://localhost:8501` and grant camera/audio permission.
 
-The eye-model creator did not provide the binary label direction or training
-normalization. Use the two temporary sidebar controls while testing:
+## 📁 Project structure
 
-- **Eye score ≥ 0.5 means OPEN**
-- **Eye-model preprocessing:** `0 to 1` or `-1 to 1`
+```text
+WakeQuest/
+├── app.py
+├── requirements.txt
+├── README.md
+├── .gitignore
+├── setup_and_run.bat
+└── models/
+    ├── best.pt
+    └── eye_model.keras
+```
 
-Choose the combination that displays OPEN with open eyes and CLOSED with closed
-eyes. Once confirmed, those values can be fixed in code and the controls hidden.
+## 👁️ Eye-model configuration
 
-## Architecture
+The eye classifier expects:
 
-Models load lazily only when their mission is selected. Browser camera frames
-arrive through `streamlit-webrtc`; deployed code never calls the server's local
-camera. Alarm settings and generated targets live in `st.session_state`.
+- RGB eye crops
+- `224 × 224` input images
+- pixel values normalized from `0` to `1`
+- score `≥ 0.5` = **open eyes**
+- score `< 0.5` = **closed eyes**
 
-## Deployment
+The developer sidebar keeps calibration switches available in case a different
+eye-model export is tested later.
 
-Test locally first. Then push all files except `.venv` to a private GitHub
-repository and deploy `app.py` on Streamlit Community Cloud. The first build is
-heavy because TensorFlow, MediaPipe, and Ultralytics must all install. If the
-free deployment exceeds memory, the eye mission may need TensorFlow Lite or a
-larger hosting plan.
+## ☁️ Deploy with Streamlit Community Cloud
 
+1. Push the project files to GitHub. Do not upload `.venv`.
+2. Connect the repository to Streamlit Community Cloud.
+3. Select `app.py` as the entry file.
+4. Wait for the Python dependencies and model files to install.
+5. Open the deployed page and grant browser camera/audio permission.
+
+TensorFlow, MediaPipe, and Ultralytics make the first installation relatively
+large. If a free deployment runs out of memory, converting the eye model to
+TensorFlow Lite is the first recommended optimization.
+
+## 🛠️ Built with
+
+- Python and Streamlit
+- OpenCV
+- MediaPipe
+- Ultralytics YOLO
+- TensorFlow / Keras and MobileNetV2
+- streamlit-webrtc
+
+## 🎓 Project note
+
+WakeQuest was created as a team computer-vision project. It demonstrates how
+classification, pose estimation, object detection, facial landmarks, and
+real-time browser video can work together inside one playful application.
+
+---
+
+<div align="center">
+  <strong>Good morning. Your alarm has a quest for you. 🌅</strong>
+</div>
