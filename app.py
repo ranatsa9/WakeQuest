@@ -18,6 +18,7 @@ import types
 import wave
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 # MediaPipe imports TensorFlow internally. Keep its native runtime lightweight
 # and deterministic on small cloud containers before either library is loaded.
@@ -31,6 +32,7 @@ import av
 import cv2
 import numpy as np
 import streamlit as st
+import streamlit.components.v1 as components
 from streamlit_webrtc import RTCConfiguration, WebRtcMode, webrtc_streamer
 
 # MediaPipe 0.10.21's top-level __init__ imports every Tasks module, including
@@ -49,6 +51,7 @@ mp.solutions = _mp_solutions
 
 
 APP_DIR = Path(__file__).resolve().parent
+APP_TIMEZONE = ZoneInfo("Asia/Riyadh")
 EYE_MODEL_PATH = APP_DIR / "models" / "eye_model.keras"
 OBJECT_MODEL_PATH = APP_DIR / "models" / "best.pt"
 RTC_CONFIGURATION = RTCConfiguration(
@@ -64,16 +67,10 @@ def draw_text(frame, text, y, color=(255, 255, 255), scale=0.65):
 
 
 class MissionProcessor:
-    def __init__(self, mirror=False):
+    def __init__(self):
         self.lock = threading.Lock()
         self.complete = False
         self.status = "Starting camera..."
-        self.mirror = mirror
-
-    def camera_image(self, frame):
-        """Convert a WebRTC frame and optionally mirror it for display/inference."""
-        image = frame.to_ndarray(format="bgr24")
-        return cv2.flip(image, 1) if self.mirror else image
 
     def snapshot(self):
         with self.lock:
@@ -132,8 +129,8 @@ def make_question(difficulty):
 
 
 class MathProcessor(MissionProcessor):
-    def __init__(self, correct_option, mirror=False):
-        super().__init__(mirror)
+    def __init__(self, correct_option):
+        super().__init__()
         self.correct_option = correct_option
         self.hands = mp.solutions.hands.Hands(
             max_num_hands=1, min_detection_confidence=0.65,
@@ -186,7 +183,7 @@ class MathProcessor(MissionProcessor):
         }.get(states)
 
     def recv(self, frame):
-        image = self.camera_image(frame)
+        image = frame.to_ndarray(format="bgr24")
         result = self.hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         choice = None
         if result.multi_hand_landmarks:
@@ -240,15 +237,15 @@ def load_pose_model():
 
 
 class SquatProcessor(MissionProcessor):
-    def __init__(self, goal, model, mirror=False):
-        super().__init__(mirror)
+    def __init__(self, goal, model):
+        super().__init__()
         self.goal = goal
         self.count = 0
         self.phase = "UP"
         self.model = model
 
     def recv(self, frame):
-        image = self.camera_image(frame)
+        image = frame.to_ndarray(format="bgr24")
         result = self.model(image, imgsz=256, conf=0.5, max_det=1, verbose=False)[0]
         knee_angle = None
         if result.keypoints is not None and len(result.keypoints.data):
@@ -291,14 +288,14 @@ def load_object_model():
 
 
 class ObjectProcessor(MissionProcessor):
-    def __init__(self, target, model, mirror=False):
-        super().__init__(mirror)
+    def __init__(self, target, model):
+        super().__init__()
         self.target = target
         self.model = model
         self.stable = 0
 
     def recv(self, frame):
-        image = self.camera_image(frame)
+        image = frame.to_ndarray(format="bgr24")
         result = self.model(image, imgsz=320, conf=0.45, verbose=False)[0]
         detected = []
         if result.boxes is not None:
@@ -331,8 +328,8 @@ def load_eye_model():
 
 
 class BlinkProcessor(MissionProcessor):
-    def __init__(self, goal, score_one_is_open, preprocessing, model, mirror=False):
-        super().__init__(mirror)
+    def __init__(self, goal, score_one_is_open, preprocessing, model):
+        super().__init__()
         self.goal = goal
         self.score_one_is_open = score_one_is_open
         self.preprocessing = preprocessing
@@ -355,7 +352,7 @@ class BlinkProcessor(MissionProcessor):
         return image
 
     def recv(self, frame):
-        image = self.camera_image(frame)
+        image = frame.to_ndarray(format="bgr24")
         if self.model is None:
             self.set_status("Missing models/eye_model.keras")
             return av.VideoFrame.from_ndarray(image, format="bgr24")
@@ -541,15 +538,33 @@ if st.session_state.just_completed:
 mission_names = ("Math Gesture", "Squats", "Object Hunt", "Eye Blinks")
 left_panel, right_panel = st.columns((0.82, 1.18), gap="large")
 
+if "alarm_minute" not in st.session_state:
+    st.session_state.alarm_minute = 30
+
+
+def adjust_alarm_minute(change):
+    st.session_state.alarm_minute = (st.session_state.alarm_minute + change) % 60
+
 with right_panel:
     st.markdown('<div class="section-label">Alarm time · 12-hour clock</div>', unsafe_allow_html=True)
     time_cols = st.columns((1, 1, .9))
     with time_cols[0]:
         alarm_hour = st.selectbox("Hour", range(1, 13), index=6)
     with time_cols[1]:
-        alarm_minute = st.number_input(
-            "Minute", min_value=0, max_value=59, value=30, step=1,
-            format="%02d", help="Type any minute from 00 to 59."
+        minute_cols = st.columns((3.6, 1, 1), gap="small", vertical_alignment="bottom")
+        with minute_cols[0]:
+            alarm_minute = st.selectbox(
+                "Minute", range(60), key="alarm_minute",
+                format_func=lambda minute: f"{minute:02d}",
+                help="Scroll through all minutes or use the − and + buttons."
+            )
+        minute_cols[1].button(
+            "−", key="minute_down", help="Previous minute",
+            on_click=adjust_alarm_minute, args=(-1,), use_container_width=True
+        )
+        minute_cols[2].button(
+            "+", key="minute_up", help="Next minute",
+            on_click=adjust_alarm_minute, args=(1,), use_container_width=True
         )
     with time_cols[2]:
         alarm_period = st.selectbox("Period", ("AM", "PM"))
@@ -590,11 +605,6 @@ st.markdown(card_html, unsafe_allow_html=True)
 with st.sidebar:
     st.markdown("### ⚙️ Developer settings")
     st.caption("Model compatibility controls for testing.")
-    mirror_camera = st.toggle(
-        "Mirror camera",
-        value=True,
-        help="Flip the camera horizontally so it behaves like a mirror. Changing this restarts the mission camera.",
-    )
     eye_mapping = st.toggle("Eye score ≥ 0.5 means OPEN", value=True,
                             help="Switch this if open eyes are displayed as CLOSED.")
     eye_preprocessing = st.selectbox("Eye-model preprocessing", ("0 to 1", "-1 to 1"),
@@ -613,10 +623,26 @@ if arm_alarm:
     st.success(f"Alarm armed for {st.session_state.armed_display}")
 
 if not st.session_state.alarm_active:
+    components.html(
+        """
+        <div id="wakequest-current-time" style="color:#a9a7bd;font:14px sans-serif;"></div>
+        <script>
+          const clock = document.getElementById("wakequest-current-time");
+          function updateClock() {
+            clock.textContent = "Current time: " + new Date().toLocaleTimeString([], {
+              hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true
+            });
+          }
+          updateClock();
+          setInterval(updateClock, 1000);
+        </script>
+        """,
+        height=28,
+    )
+
     @st.fragment(run_every=1)
     def alarm_clock():
-        now = datetime.now().strftime("%H:%M:%S")
-        st.caption(f"Current time: {datetime.now().strftime('%I:%M:%S %p').lstrip('0')}")
+        now = datetime.now(APP_TIMEZONE).strftime("%H:%M:%S")
         if (st.session_state.get("armed_for")
                 and now[:5] == st.session_state.armed_for):
             selected = st.session_state.get("armed_mission", mission)
@@ -642,21 +668,17 @@ if mission == "Math Gesture":
     prompt, choices, correct_option = st.session_state.question
     st.subheader(prompt)
     st.write(" ".join(f"**{i}.** {value}" for i, value in enumerate(choices, 1)))
-    processor_factory = lambda: MathProcessor(correct_option, mirror_camera)
+    processor_factory = lambda: MathProcessor(correct_option)
 elif mission == "Squats":
     squat_goal = st.session_state.squat_goal
     pose_model = load_pose_model()
     st.subheader(f"Complete {squat_goal} squats")
-    processor_factory = lambda goal=squat_goal, model=pose_model: SquatProcessor(
-        goal, model, mirror_camera
-    )
+    processor_factory = lambda goal=squat_goal, model=pose_model: SquatProcessor(goal, model)
 elif mission == "Object Hunt":
     object_target = st.session_state.object_target
     object_model = load_object_model()
     st.subheader(f"Show a {object_target} to the camera")
-    processor_factory = lambda target=object_target, model=object_model: ObjectProcessor(
-        target, model, mirror_camera
-    )
+    processor_factory = lambda target=object_target, model=object_model: ObjectProcessor(target, model)
 else:
     blink_goal = st.session_state.blink_goal
     eye_model = load_eye_model()
@@ -664,11 +686,11 @@ else:
     captured_eye_preprocessing = eye_preprocessing
     st.subheader(f"Blink {blink_goal} times")
     processor_factory = lambda goal=blink_goal, mapping=captured_eye_mapping, prep=captured_eye_preprocessing, model=eye_model: BlinkProcessor(
-        goal, mapping, prep, model, mirror_camera
+        goal, mapping, prep, model
     )
 
 ctx = webrtc_streamer(
-    key=f"wakequest-{mission}-{key}-mirror-{int(mirror_camera)}",
+    key=f"wakequest-{mission}-{key}",
     mode=WebRtcMode.SENDRECV,
     rtc_configuration=RTC_CONFIGURATION,
     media_stream_constraints={
