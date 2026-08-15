@@ -541,8 +541,10 @@ with right_panel:
     with time_cols[0]:
         alarm_hour = st.selectbox("Hour", range(1, 13), index=6)
     with time_cols[1]:
-        alarm_minute = st.selectbox("Minute", range(0, 60, 5), index=6,
-                                    format_func=lambda value: f"{value:02d}")
+        alarm_minute = st.number_input(
+            "Minute", min_value=0, max_value=59, value=30, step=1,
+            format="%02d", help="Type any minute from 00 to 59."
+        )
     with time_cols[2]:
         alarm_period = st.selectbox("Period", ("AM", "PM"))
 
