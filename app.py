@@ -116,11 +116,37 @@ class MathProcessor(MissionProcessor):
 
     @staticmethod
     def gesture(landmarks):
-        tips, pips = (8, 12, 16, 20), (6, 10, 14, 18)
-        palm_height = abs(landmarks[0].y - landmarks[9].y)
-        margin = max(0.015, palm_height * 0.12)
-        states = tuple(landmarks[t].y < landmarks[p].y - margin
-                       for t, p in zip(tips, pips))
+        # Detect extension from finger geometry instead of screen direction.
+        # Comparing tip.y with pip.y breaks when the hand is tilted and can
+        # incorrectly count a folded pinky (for example, showing 3 as 4).
+        wrist = np.array((landmarks[0].x, landmarks[0].y))
+        finger_joints = (
+            (5, 6, 8),    # index: MCP, PIP, tip
+            (9, 10, 12),  # middle
+            (13, 14, 16), # ring
+            (17, 18, 20), # pinky
+        )
+
+        states = []
+        for mcp_i, pip_i, tip_i in finger_joints:
+            mcp = np.array((landmarks[mcp_i].x, landmarks[mcp_i].y))
+            pip = np.array((landmarks[pip_i].x, landmarks[pip_i].y))
+            tip = np.array((landmarks[tip_i].x, landmarks[tip_i].y))
+
+            # A raised finger is nearly straight at its PIP joint and its tip
+            # is farther from the wrist than the PIP. Both tests are invariant
+            # to the hand's rotation in the camera image.
+            v1, v2 = mcp - pip, tip - pip
+            denom = np.linalg.norm(v1) * np.linalg.norm(v2)
+            joint_angle = 0.0 if denom < 1e-8 else np.degrees(
+                np.arccos(np.clip(np.dot(v1, v2) / denom, -1.0, 1.0))
+            )
+            farther_from_wrist = (
+                np.linalg.norm(tip - wrist) > np.linalg.norm(pip - wrist) * 1.08
+            )
+            states.append(joint_angle > 155.0 and farther_from_wrist)
+
+        states = tuple(states)
         return {
             (True, False, False, False): 1,
             (True, True, False, False): 2,
@@ -406,34 +432,47 @@ def begin_mission(mission, difficulty):
 
 
 st.set_page_config(page_title="WakeQuest · Mission Alarm", page_icon="⏰", layout="wide",
-                   initial_sidebar_state="expanded")
+                   initial_sidebar_state="collapsed")
 initialize_state()
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
-:root { --cyan:#52e5ff; --violet:#9b7cff; --lime:#8fffa8; --ink:#070a13; }
+:root { --cyan:#76e7ff; --violet:#a982ff; --pink:#f4a8ff; --lime:#9affc1; --ink:#080716; }
 .stApp {
   background:
-    radial-gradient(circle at 12% 5%, rgba(82,229,255,.13), transparent 28rem),
-    radial-gradient(circle at 88% 2%, rgba(155,124,255,.15), transparent 30rem),
-    linear-gradient(145deg, #070a13 0%, #0b1020 46%, #080b14 100%);
+    radial-gradient(circle at 18% 2%, rgba(132,91,238,.28), transparent 32rem),
+    radial-gradient(circle at 88% 12%, rgba(83,183,255,.16), transparent 28rem),
+    linear-gradient(145deg, #080713 0%, #11102a 48%, #080b17 100%);
   color:#eef4ff; font-family:'DM Sans',sans-serif;
 }
-[data-testid="stSidebar"] { background:rgba(8,12,24,.88); border-right:1px solid rgba(255,255,255,.08); }
+[data-testid="stSidebar"] { background:rgba(9,8,23,.96); border-right:1px solid rgba(255,255,255,.08); }
 [data-testid="stSidebar"] > div { padding-top:1.25rem; }
 h1,h2,h3 { font-family:'Space Grotesk',sans-serif !important; letter-spacing:-.025em; }
-.block-container { max-width:1180px; padding-top:2rem; }
-.wake-hero { position:relative; overflow:hidden; padding:2rem 2.2rem; border:1px solid rgba(255,255,255,.10);
-  border-radius:28px; background:linear-gradient(120deg,rgba(255,255,255,.075),rgba(255,255,255,.025));
-  box-shadow:0 25px 80px rgba(0,0,0,.32); backdrop-filter:blur(20px); margin-bottom:1.4rem; }
+.block-container { max-width:1120px; padding-top:1.5rem; padding-bottom:3rem; }
+.wake-hero { position:relative; overflow:hidden; padding:1.5rem 1.8rem; border:1px solid rgba(255,255,255,.10);
+  border-radius:26px; background:linear-gradient(120deg,rgba(169,130,255,.11),rgba(255,255,255,.025));
+  box-shadow:0 25px 80px rgba(0,0,0,.32); backdrop-filter:blur(22px); margin-bottom:1.25rem; }
 .wake-kicker { color:var(--cyan); font-size:.75rem; font-weight:700; letter-spacing:.18em; text-transform:uppercase; }
-.wake-title { font-family:'Space Grotesk',sans-serif; font-size:clamp(2.5rem,6vw,5rem); line-height:.95;
-  font-weight:700; margin:.55rem 0 .8rem; letter-spacing:-.065em; }
+.wake-title { font-family:'Space Grotesk',sans-serif; font-size:clamp(2.35rem,5vw,4.3rem); line-height:.96;
+  font-weight:700; margin:.45rem 0 .6rem; letter-spacing:-.06em; }
 .wake-title span { background:linear-gradient(90deg,var(--cyan),#b9a6ff); -webkit-background-clip:text; color:transparent; }
 .wake-sub { color:#aebbd1; max-width:650px; font-size:1.02rem; }
-.mission-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.8rem; margin:1.15rem 0 1.5rem; }
+.alarm-stage { padding:1.35rem; border:1px solid rgba(255,255,255,.09); border-radius:26px;
+  background:linear-gradient(145deg,rgba(255,255,255,.075),rgba(255,255,255,.025)); box-shadow:0 22px 65px rgba(0,0,0,.28); }
+.clock-shell { width:min(290px,80vw); aspect-ratio:1; margin:.3rem auto 1rem; border-radius:50%; padding:12px;
+  background:conic-gradient(from 210deg,#6ee7ff,#ad7cff,#f2a8ff,#6ee7ff); box-shadow:0 0 55px rgba(165,116,255,.27); }
+.clock-face { height:100%; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:radial-gradient(circle at 45% 32%,#29234d,#0c0b1c 72%); border:1px solid rgba(255,255,255,.18); }
+.clock-label { color:#a9a1c7; text-transform:uppercase; letter-spacing:.16em; font-size:.68rem; font-weight:700; }
+.clock-time { font:700 clamp(2.65rem,6vw,4.25rem)/1 'Space Grotesk',sans-serif; margin:.35rem 0; letter-spacing:-.06em; }
+.clock-time small { font-size:.28em; letter-spacing:.04em; color:#c9b8ff; margin-left:.25rem; }
+.clock-note { color:#8c86a7; font-size:.8rem; }
+.section-label { color:#d8d2eb; font-size:.76rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin:.2rem 0 .65rem; }
+.mission-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.8rem; margin:.7rem 0 1.4rem; }
 .mission-card { padding:1rem; min-height:112px; border-radius:18px; border:1px solid rgba(255,255,255,.09);
-  background:rgba(255,255,255,.035); }
+  background:rgba(255,255,255,.035); transition:.2s ease; }
+.mission-card.active { border-color:rgba(177,135,255,.85); background:linear-gradient(145deg,rgba(160,112,255,.22),rgba(85,196,255,.08));
+  box-shadow:0 10px 35px rgba(122,80,235,.22),inset 0 0 24px rgba(194,160,255,.06); transform:translateY(-2px); }
 .mission-card b { display:block; margin:.65rem 0 .2rem; font-family:'Space Grotesk',sans-serif; }
 .mission-card small { color:#91a0b8; }
 .mission-icon { font-size:1.35rem; }
@@ -442,57 +481,94 @@ h1,h2,h3 { font-family:'Space Grotesk',sans-serif !important; letter-spacing:-.0
 .status-dot { width:7px; height:7px; border-radius:50%; background:currentColor; box-shadow:0 0 12px currentColor; }
 div[data-testid="stButton"] button { border-radius:14px; min-height:46px; font-weight:700; border:1px solid rgba(255,255,255,.14); }
 div[data-testid="stButton"] button[kind="primary"] { background:linear-gradient(100deg,#28bfd7,#7560ee); border:0; box-shadow:0 12px 30px rgba(65,116,238,.25); }
-div[data-testid="stSelectbox"] > div > div, div[data-testid="stTimeInput"] > div > div { border-radius:13px; }
+div[data-testid="stSelectbox"] > div > div, div[data-testid="stNumberInput"] > div > div { border-radius:13px; }
 [data-testid="stAlert"] { border-radius:16px; }
 video { border-radius:22px !important; border:1px solid rgba(255,255,255,.12); box-shadow:0 24px 70px rgba(0,0,0,.35); }
-@media(max-width:800px){ .mission-grid{grid-template-columns:repeat(2,1fr)} .wake-hero{padding:1.5rem} }
+@media(max-width:800px){ .mission-grid{grid-template-columns:repeat(2,1fr)} .wake-hero{padding:1.3rem} .clock-shell{width:230px} }
 </style>
 <section class="wake-hero">
-  <div class="wake-kicker">Computer vision alarm system</div>
-  <div class="wake-title">Wake up.<br><span>Prove it.</span></div>
-  <div class="wake-sub">An alarm that does not negotiate. Complete a live vision mission to silence it and start the day fully awake.</div>
+  <div class="wake-kicker">WakeQuest · Computer vision alarm</div>
+  <div class="wake-title">Wake up. <span>Prove it.</span></div>
+  <div class="wake-sub">Set your wake-up time, choose a live mission, and earn the silence.</div>
 </section>
-<div class="mission-grid">
-  <div class="mission-card"><span class="mission-icon">✋</span><b>Math Gesture</b><small>Solve, then answer with your hand.</small></div>
-  <div class="mission-card"><span class="mission-icon">🏋️</span><b>Squat Sprint</b><small>Pose-verified movement challenge.</small></div>
-  <div class="mission-card"><span class="mission-icon">🔎</span><b>Object Hunt</b><small>Find the requested real-world item.</small></div>
-  <div class="mission-card"><span class="mission-icon">👁️</span><b>Blink Check</b><small>Wakefulness verified through vision.</small></div>
-</div>
 """, unsafe_allow_html=True)
 
 if st.session_state.just_completed:
     st.session_state.just_completed = False
     st.success("Mission complete — alarm stopped!")
-    st.balloons()
+
+mission_names = ("Math Gesture", "Squats", "Object Hunt", "Eye Blinks")
+left_panel, right_panel = st.columns((0.82, 1.18), gap="large")
+
+with right_panel:
+    st.markdown('<div class="section-label">Alarm time · 12-hour clock</div>', unsafe_allow_html=True)
+    time_cols = st.columns((1, 1, .9))
+    with time_cols[0]:
+        alarm_hour = st.selectbox("Hour", range(1, 13), index=6)
+    with time_cols[1]:
+        alarm_minute = st.selectbox("Minute", range(0, 60, 5), index=6,
+                                    format_func=lambda value: f"{value:02d}")
+    with time_cols[2]:
+        alarm_period = st.selectbox("Period", ("AM", "PM"))
+
+    mission = st.selectbox("Wake-up mission", mission_names)
+    difficulty = st.selectbox("Math difficulty", ("Easy", "Medium", "Hard"),
+                              disabled=mission != "Math Gesture")
+    action_cols = st.columns(2)
+    start_now = action_cols[0].button("Test mission", use_container_width=True)
+    arm_alarm = action_cols[1].button("Set alarm", type="primary", use_container_width=True)
+
+display_time = f"{alarm_hour}:{alarm_minute:02d}"
+with left_panel:
+    st.markdown(f"""
+    <div class="alarm-stage">
+      <div class="clock-shell"><div class="clock-face">
+        <div class="clock-label">Your alarm</div>
+        <div class="clock-time">{display_time}<small>{alarm_period}</small></div>
+        <div class="clock-note">Mission required to dismiss</div>
+      </div></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+cards = (
+    ("Math Gesture", "✋", "Math Gesture", "Solve and answer by hand"),
+    ("Squats", "🏋️", "Squat Sprint", "Pose-verified movement"),
+    ("Object Hunt", "🔎", "Object Hunt", "Find the requested item"),
+    ("Eye Blinks", "👁️", "Blink Check", "Wakefulness through vision"),
+)
+card_html = '<div class="section-label">Choose your challenge</div><div class="mission-grid">'
+for value, icon, title, description in cards:
+    active = " active" if mission == value else ""
+    card_html += (f'<div class="mission-card{active}"><span class="mission-icon">{icon}</span>'
+                  f'<b>{title}</b><small>{description}</small></div>')
+card_html += "</div>"
+st.markdown(card_html, unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown("### ⏰ Mission control")
-    st.caption("Configure the challenge that stands between you and silence.")
-    alarm_time = st.time_input("Alarm time")
-    mission = st.selectbox("Mission", ("Math Gesture", "Squats", "Object Hunt", "Eye Blinks"))
-    difficulty = st.selectbox("Math difficulty", ("Easy", "Medium", "Hard"), disabled=mission != "Math Gesture")
+    st.markdown("### ⚙️ Developer settings")
+    st.caption("Model compatibility controls for testing.")
     eye_mapping = st.toggle("Eye score ≥ 0.5 means OPEN", value=True,
                             help="Switch this if open eyes are displayed as CLOSED.")
     eye_preprocessing = st.selectbox("Eye-model preprocessing", ("0 to 1", "-1 to 1"),
                                      help="Use the setting used during model training.")
-    start_now = st.button("Test mission now", type="primary", use_container_width=True)
-    arm_alarm = st.button("Set alarm", use_container_width=True)
 
 if start_now:
     begin_mission(mission, difficulty)
 if arm_alarm:
+    alarm_hour_24 = alarm_hour % 12 + (12 if alarm_period == "PM" else 0)
     st.session_state.alarm_active = False
     st.session_state.mission_complete = False
-    st.session_state.armed_for = alarm_time.strftime("%H:%M")
+    st.session_state.armed_for = f"{alarm_hour_24:02d}:{alarm_minute:02d}"
+    st.session_state.armed_display = f"{display_time} {alarm_period}"
     st.session_state.armed_mission = mission
     st.session_state.armed_difficulty = difficulty
-    st.success(f"Alarm armed for {st.session_state.armed_for}")
+    st.success(f"Alarm armed for {st.session_state.armed_display}")
 
 if not st.session_state.alarm_active:
     @st.fragment(run_every=1)
     def alarm_clock():
         now = datetime.now().strftime("%H:%M:%S")
-        st.caption(f"Current time: {now}")
+        st.caption(f"Current time: {datetime.now().strftime('%I:%M:%S %p').lstrip('0')}")
         if (st.session_state.get("armed_for")
                 and now[:5] == st.session_state.armed_for):
             selected = st.session_state.get("armed_mission", mission)
@@ -505,7 +581,8 @@ if not st.session_state.alarm_active:
     st.markdown('<span class="status-chip"><span class="status-dot"></span> SYSTEM READY</span>', unsafe_allow_html=True)
     st.info("Set an alarm or click **Test mission now** to launch the selected challenge.")
     if st.session_state.get("armed_for"):
-        st.write(f"Alarm is armed for **{st.session_state.armed_for}**. Refresh near that time if this page is idle.")
+        armed_label = st.session_state.get("armed_display", st.session_state.armed_for)
+        st.write(f"Alarm is armed for **{armed_label}**. Keep this page open so the alarm can start.")
     st.stop()
 
 mission = st.session_state.get("active_mission", mission)
