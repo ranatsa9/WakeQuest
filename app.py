@@ -8,10 +8,13 @@ from __future__ import annotations
 
 import math
 import os
+import importlib.util
 import random
+import sys
 import tempfile
 import threading
 import time
+import types
 import wave
 from datetime import datetime
 from pathlib import Path
@@ -26,10 +29,23 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import av
 import cv2
-import mediapipe as mp
 import numpy as np
 import streamlit as st
 from streamlit_webrtc import RTCConfiguration, WebRtcMode, webrtc_streamer
+
+# MediaPipe 0.10.21's top-level __init__ imports every Tasks module, including
+# optional GenAI code that eagerly initializes TensorFlow. That can crash a
+# small Streamlit Cloud process before the UI appears. Load only the legacy
+# Solutions package used by WakeQuest (Hands and Face Mesh).
+_mp_spec = importlib.util.find_spec("mediapipe")
+if _mp_spec is None or not _mp_spec.submodule_search_locations:
+    raise ImportError("MediaPipe is not installed")
+mp = types.ModuleType("mediapipe")
+mp.__path__ = list(_mp_spec.submodule_search_locations)
+mp.__spec__ = _mp_spec
+sys.modules["mediapipe"] = mp
+import mediapipe.python.solutions as _mp_solutions
+mp.solutions = _mp_solutions
 
 
 APP_DIR = Path(__file__).resolve().parent
