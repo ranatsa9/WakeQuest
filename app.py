@@ -524,7 +524,12 @@ div[data-testid="stButton"] button[kind="primary"] { background:linear-gradient(
 div[data-testid="stSelectbox"] > div > div, div[data-testid="stNumberInput"] > div > div { border-radius:13px; }
 [data-testid="stAlert"] { border-radius:16px; }
 video { border-radius:22px !important; border:1px solid rgba(255,255,255,.12); box-shadow:0 24px 70px rgba(0,0,0,.35); }
-iframe[title="wakequest_alarm_clock"] { background:transparent !important; border:0 !important; }
+iframe[title*="wakequest_alarm_clock"],
+[data-testid="stCustomComponentV1"],
+[data-testid="stCustomComponentV1"] > div,
+[data-testid="stCustomComponentV1"] iframe {
+  background:none !important; background-color:transparent !important; border:0 !important;
+}
 .alarm-summary { margin:.85rem 0 .2rem; padding:.9rem 1rem; border-radius:16px;
   border:1px solid rgba(115,231,187,.28); background:linear-gradient(120deg,rgba(82,218,166,.13),rgba(102,112,238,.11));
   box-shadow:0 12px 32px rgba(0,0,0,.18); }
