@@ -346,7 +346,7 @@ class BlinkProcessor(MissionProcessor):
             image /= 255.0
         else:
             image = image / 127.5 - 1.0
-        return image[None, ...]
+        return image
 
     def recv(self, frame):
         image = frame.to_ndarray(format="bgr24")
@@ -357,9 +357,10 @@ class BlinkProcessor(MissionProcessor):
         label, score = None, None
         if result.multi_face_landmarks:
             landmarks = result.multi_face_landmarks[0].landmark
-            scores = []
+            eye_inputs = []
             # Classify each eye separately because eye-state datasets normally
-            # contain single-eye crops rather than the whole face.
+            # contain single-eye crops rather than the whole face. Both crops
+            # are sent in one batch to avoid two expensive cloud model calls.
             for indices in ((33, 133, 159, 145), (362, 263, 386, 374)):
                 xs = [landmarks[i].x * image.shape[1] for i in indices]
                 ys = [landmarks[i].y * image.shape[0] for i in indices]
@@ -372,18 +373,20 @@ class BlinkProcessor(MissionProcessor):
                 crop = image[y1:y2, x1:x2]
                 if crop.size:
                     rgb_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                    scores.append(float(self.model.predict(
-                        self.preprocess(rgb_crop), verbose=0
-                    )[0][0]))
+                    eye_inputs.append(self.preprocess(rgb_crop))
                     cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            if scores:
+            if eye_inputs:
+                predictions = self.model(
+                    np.stack(eye_inputs, axis=0), training=False
+                )
+                scores = np.asarray(predictions).reshape(-1).tolist()
                 score = sum(scores) / len(scores)
                 is_open = score >= 0.5 if self.score_one_is_open else score < 0.5
                 label = "OPEN" if is_open else "CLOSED"
                 if is_open:
                     self.open_frames += 1
                     self.closed_frames = 0
-                    if self.was_closed and self.open_frames >= 3:
+                    if self.was_closed and self.open_frames >= 2:
                         self.blinks += 1
                         self.was_closed = False
                         if self.blinks >= self.goal:
@@ -391,7 +394,7 @@ class BlinkProcessor(MissionProcessor):
                 else:
                     self.closed_frames += 1
                     self.open_frames = 0
-                    if self.closed_frames >= 3:
+                    if self.closed_frames >= 2:
                         self.was_closed = True
                 if not self.complete:
                     self.set_status(f"Blinks: {self.blinks}/{self.goal} - eyes {label}")
@@ -653,8 +656,10 @@ ctx = webrtc_streamer(
     rtc_configuration=RTC_CONFIGURATION,
     media_stream_constraints={
         "video": {
-            "width": {"ideal": 1280, "min": 640},
-            "height": {"ideal": 720, "min": 480},
+            "width": {"ideal": 640 if mission == "Eye Blinks" else 1280,
+                      "min": 640},
+            "height": {"ideal": 480 if mission == "Eye Blinks" else 720,
+                       "min": 480},
             "frameRate": {"ideal": 24, "max": 30},
         },
         "audio": False,
