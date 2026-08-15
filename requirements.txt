@@ -1,0 +1,9 @@
+streamlit>=1.40
+streamlit-webrtc>=0.47
+av>=12
+mediapipe==0.10.21
+opencv-python-headless>=4.9,<4.12
+numpy>=1.26,<2
+ultralytics>=8.3
+tensorflow-cpu>=2.16,<2.20
+keras>=3.3,<4
