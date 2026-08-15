@@ -54,9 +54,6 @@ APP_DIR = Path(__file__).resolve().parent
 APP_TIMEZONE = ZoneInfo("Asia/Riyadh")
 EYE_MODEL_PATH = APP_DIR / "models" / "eye_model.keras"
 OBJECT_MODEL_PATH = APP_DIR / "models" / "best.pt"
-alarm_clock_picker = components.declare_component(
-    "wakequest_alarm_clock", path=str(APP_DIR / "clock_picker")
-)
 RTC_CONFIGURATION = RTCConfiguration(
     {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
 )
@@ -491,17 +488,21 @@ h1,h2,h3 { font-family:'Space Grotesk',sans-serif !important; letter-spacing:-.0
   font-weight:700; margin:.45rem 0 .6rem; letter-spacing:-.06em; }
 .wake-title span { background:linear-gradient(90deg,var(--cyan),#b9a6ff); -webkit-background-clip:text; color:transparent; }
 .wake-sub { color:#aebbd1; max-width:650px; font-size:1.02rem; }
-.alarm-stage { min-height:356px; padding:1.25rem; display:flex; align-items:center; justify-content:center;
-  border:1px solid rgba(255,255,255,.09); border-radius:26px;
-  background:linear-gradient(145deg,rgba(255,255,255,.075),rgba(255,255,255,.025)); box-shadow:0 22px 65px rgba(0,0,0,.28); }
-.clock-shell { width:min(290px,calc(100% - 1rem)); aspect-ratio:1; margin:0 auto; flex:0 0 auto; border-radius:50%; padding:12px;
-  background:conic-gradient(from 210deg,#6ee7ff,#ad7cff,#f2a8ff,#6ee7ff); box-shadow:0 0 55px rgba(165,116,255,.27); }
+.alarm-stage { min-height:430px; padding:1.7rem; display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,.14); border-radius:34px;
+  background:linear-gradient(145deg,rgba(255,255,255,.11),rgba(151,105,255,.045));
+  box-shadow:0 28px 90px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.13); backdrop-filter:blur(28px); }
+.clock-shell { width:min(350px,calc(100% - 1rem)); aspect-ratio:1; margin:0 auto; flex:0 0 auto; border-radius:50%; padding:13px;
+  background:conic-gradient(from 210deg,#6ee7ff,#ad7cff,#f2a8ff,#6ee7ff); box-shadow:0 0 75px rgba(165,116,255,.34); }
 .clock-face { height:100%; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center;
   background:radial-gradient(circle at 45% 32%,#29234d,#0c0b1c 72%); border:1px solid rgba(255,255,255,.18); }
 .clock-label { color:#a9a1c7; text-transform:uppercase; letter-spacing:.16em; font-size:.68rem; font-weight:700; }
 .clock-time { font:700 clamp(2.65rem,6vw,4.25rem)/1 'Space Grotesk',sans-serif; margin:.35rem 0; letter-spacing:-.06em; }
 .clock-time small { font-size:.28em; letter-spacing:.04em; color:#c9b8ff; margin-left:.25rem; }
 .clock-note { color:#8c86a7; font-size:.8rem; }
+.setting-panel { max-width:760px; margin:.25rem auto 1.25rem; padding:1.2rem 1.35rem .25rem; border-radius:24px;
+  border:1px solid rgba(255,255,255,.10); background:linear-gradient(135deg,rgba(255,255,255,.065),rgba(255,255,255,.025));
+  box-shadow:0 18px 55px rgba(0,0,0,.22); backdrop-filter:blur(20px); }
 .section-label { color:#d8d2eb; font-size:.76rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin:.2rem 0 .65rem; }
 .mission-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.8rem; margin:.7rem 0 1.4rem; }
 .mission-card { padding:1rem; min-height:112px; border-radius:18px; border:1px solid rgba(255,255,255,.09);
@@ -523,8 +524,8 @@ video { border-radius:22px !important; border:1px solid rgba(255,255,255,.12); b
   .block-container{padding-top:4.25rem}
   .mission-grid{grid-template-columns:repeat(2,1fr)}
   .wake-hero{padding:1.3rem}
-  .alarm-stage{min-height:300px}
-  .clock-shell{width:min(255px,calc(100% - .5rem))}
+  .alarm-stage{min-height:340px}
+  .clock-shell{width:min(285px,calc(100% - .5rem))}
 }
 </style>
 <section class="wake-hero">
@@ -539,7 +540,6 @@ if st.session_state.just_completed:
     st.success("Mission complete — alarm stopped!")
 
 mission_names = ("Math Gesture", "Squats", "Object Hunt", "Eye Blinks")
-left_panel, right_panel = st.columns((0.82, 1.18), gap="large")
 
 if "alarm_minute" not in st.session_state:
     st.session_state.alarm_minute = 30
@@ -548,27 +548,23 @@ if "alarm_hour" not in st.session_state:
 if "alarm_period" not in st.session_state:
     st.session_state.alarm_period = "AM"
 
-with right_panel:
-    st.markdown('<div class="section-label">Alarm time · 12-hour clock</div>', unsafe_allow_html=True)
-    picker_value = alarm_clock_picker(
-        hour=st.session_state.alarm_hour,
-        minute=st.session_state.alarm_minute,
-        period=st.session_state.alarm_period,
-        default={
-            "hour": st.session_state.alarm_hour,
-            "minute": st.session_state.alarm_minute,
-            "period": st.session_state.alarm_period,
-        },
-        key="alarm_clock_picker",
-    )
-    if picker_value:
-        st.session_state.alarm_hour = int(picker_value.get("hour", 7))
-        st.session_state.alarm_minute = int(picker_value.get("minute", 30))
-        st.session_state.alarm_period = picker_value.get("period", "AM")
-    alarm_hour = st.session_state.alarm_hour
-    alarm_minute = st.session_state.alarm_minute
-    alarm_period = st.session_state.alarm_period
+display_columns = st.columns((.72, 1.56, .72))
+with display_columns[1]:
+    alarm_display = st.empty()
 
+control_columns = st.columns((.35, 2.3, .35))
+with control_columns[1]:
+    st.markdown('<div class="section-label">Set your alarm · 12-hour time</div>', unsafe_allow_html=True)
+    time_controls = st.columns((1, 1.35, 1), gap="medium")
+    alarm_hour = time_controls[0].selectbox("Hour", range(1, 13), key="alarm_hour")
+    alarm_minute = time_controls[1].selectbox(
+        "Minute", range(60), key="alarm_minute",
+        format_func=lambda minute: f"{minute:02d}",
+        help="Scroll or type to select any minute from 00 to 59."
+    )
+    alarm_period = time_controls[2].segmented_control(
+        "Period", ("AM", "PM"), key="alarm_period", selection_mode="single"
+    )
     mission = st.selectbox("Wake-up mission", mission_names)
     difficulty = st.selectbox("Math difficulty", ("Easy", "Medium", "Hard"),
                               disabled=mission != "Math Gesture")
@@ -577,8 +573,7 @@ with right_panel:
     arm_alarm = action_cols[1].button("Set alarm", type="primary", use_container_width=True)
 
 display_time = f"{alarm_hour}:{alarm_minute:02d}"
-with left_panel:
-    st.markdown(f"""
+alarm_display.markdown(f"""
     <div class="alarm-stage">
       <div class="clock-shell"><div class="clock-face">
         <div class="clock-label">Your alarm</div>
