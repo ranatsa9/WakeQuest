@@ -54,6 +54,9 @@ APP_DIR = Path(__file__).resolve().parent
 APP_TIMEZONE = ZoneInfo("Asia/Riyadh")
 EYE_MODEL_PATH = APP_DIR / "models" / "eye_model.keras"
 OBJECT_MODEL_PATH = APP_DIR / "models" / "best.pt"
+alarm_clock_picker = components.declare_component(
+    "wakequest_alarm_clock", path=str(APP_DIR / "clock_picker")
+)
 RTC_CONFIGURATION = RTCConfiguration(
     {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
 )
@@ -540,20 +543,31 @@ left_panel, right_panel = st.columns((0.82, 1.18), gap="large")
 
 if "alarm_minute" not in st.session_state:
     st.session_state.alarm_minute = 30
+if "alarm_hour" not in st.session_state:
+    st.session_state.alarm_hour = 7
+if "alarm_period" not in st.session_state:
+    st.session_state.alarm_period = "AM"
 
 with right_panel:
     st.markdown('<div class="section-label">Alarm time · 12-hour clock</div>', unsafe_allow_html=True)
-    time_cols = st.columns((1.15, .85), gap="medium")
-    with time_cols[0]:
-        alarm_hour = st.selectbox("Hour", range(1, 13), index=6)
-    with time_cols[1]:
-        alarm_period = st.segmented_control(
-            "Period", ("AM", "PM"), default="AM", selection_mode="single"
-        )
-    alarm_minute = st.slider(
-        "Minute", min_value=0, max_value=59, key="alarm_minute",
-        format="%02d", help="Drag to any exact minute from 00 to 59."
+    picker_value = alarm_clock_picker(
+        hour=st.session_state.alarm_hour,
+        minute=st.session_state.alarm_minute,
+        period=st.session_state.alarm_period,
+        default={
+            "hour": st.session_state.alarm_hour,
+            "minute": st.session_state.alarm_minute,
+            "period": st.session_state.alarm_period,
+        },
+        key="alarm_clock_picker",
     )
+    if picker_value:
+        st.session_state.alarm_hour = int(picker_value.get("hour", 7))
+        st.session_state.alarm_minute = int(picker_value.get("minute", 30))
+        st.session_state.alarm_period = picker_value.get("period", "AM")
+    alarm_hour = st.session_state.alarm_hour
+    alarm_minute = st.session_state.alarm_minute
+    alarm_period = st.session_state.alarm_period
 
     mission = st.selectbox("Wake-up mission", mission_names)
     difficulty = st.selectbox("Math difficulty", ("Easy", "Medium", "Hard"),
