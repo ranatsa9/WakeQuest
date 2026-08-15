@@ -111,6 +111,8 @@ class MathProcessor(MissionProcessor):
         self.stable = StableValue(12)
         self.locked = False
         self.empty_frames = 0
+        self.locked_choice = None
+        self.changed_frames = 0
 
     @staticmethod
     def gesture(landmarks):
@@ -139,9 +141,15 @@ class MathProcessor(MissionProcessor):
 
         if self.locked:
             self.empty_frames = self.empty_frames + 1 if choice is None else 0
-            if self.empty_frames >= 6:
+            if choice is not None and choice != self.locked_choice:
+                self.changed_frames += 1
+            else:
+                self.changed_frames = 0
+            if self.empty_frames >= 6 or self.changed_frames >= 5:
                 self.locked = False
                 self.stable.update(None)
+                self.empty_frames = 0
+                self.changed_frames = 0
                 self.set_status("Try again: show the correct option")
         else:
             accepted = self.stable.update(choice)
@@ -149,6 +157,7 @@ class MathProcessor(MissionProcessor):
                 self.set_status(f"Detected option {choice}: hold steady")
             if accepted:
                 self.locked = True
+                self.locked_choice = accepted
                 if accepted == self.correct_option:
                     self.set_status(f"Correct! Option {accepted}", True)
                 else:
@@ -174,12 +183,12 @@ def load_pose_model():
 
 
 class SquatProcessor(MissionProcessor):
-    def __init__(self, goal):
+    def __init__(self, goal, model):
         super().__init__()
         self.goal = goal
         self.count = 0
         self.phase = "UP"
-        self.model = load_pose_model()
+        self.model = model
 
     def recv(self, frame):
         image = frame.to_ndarray(format="bgr24")
@@ -225,10 +234,10 @@ def load_object_model():
 
 
 class ObjectProcessor(MissionProcessor):
-    def __init__(self, target):
+    def __init__(self, target, model):
         super().__init__()
         self.target = target
-        self.model = load_object_model()
+        self.model = model
         self.stable = 0
 
     def recv(self, frame):
@@ -265,12 +274,12 @@ def load_eye_model():
 
 
 class BlinkProcessor(MissionProcessor):
-    def __init__(self, goal, score_one_is_open, preprocessing):
+    def __init__(self, goal, score_one_is_open, preprocessing, model):
         super().__init__()
         self.goal = goal
         self.score_one_is_open = score_one_is_open
         self.preprocessing = preprocessing
-        self.model = load_eye_model()
+        self.model = model
         self.mesh = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=1, refine_landmarks=True,
             min_detection_confidence=0.6, min_tracking_confidence=0.6
@@ -373,6 +382,7 @@ def initialize_state():
         "squat_goal": None,
         "object_target": None,
         "blink_goal": None,
+        "just_completed": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -450,6 +460,11 @@ video { border-radius:22px !important; border:1px solid rgba(255,255,255,.12); b
 </div>
 """, unsafe_allow_html=True)
 
+if st.session_state.just_completed:
+    st.session_state.just_completed = False
+    st.success("Mission complete — alarm stopped!")
+    st.balloons()
+
 with st.sidebar:
     st.markdown("### ⏰ Mission control")
     st.caption("Configure the challenge that stands between you and silence.")
@@ -504,15 +519,23 @@ if mission == "Math Gesture":
     st.write(" ".join(f"**{i}.** {value}" for i, value in enumerate(choices, 1)))
     processor_factory = lambda: MathProcessor(correct_option)
 elif mission == "Squats":
-    st.subheader(f"Complete {st.session_state.squat_goal} squats")
-    processor_factory = lambda: SquatProcessor(st.session_state.squat_goal)
+    squat_goal = st.session_state.squat_goal
+    pose_model = load_pose_model()
+    st.subheader(f"Complete {squat_goal} squats")
+    processor_factory = lambda goal=squat_goal, model=pose_model: SquatProcessor(goal, model)
 elif mission == "Object Hunt":
-    st.subheader(f"Show a {st.session_state.object_target} to the camera")
-    processor_factory = lambda: ObjectProcessor(st.session_state.object_target)
+    object_target = st.session_state.object_target
+    object_model = load_object_model()
+    st.subheader(f"Show a {object_target} to the camera")
+    processor_factory = lambda target=object_target, model=object_model: ObjectProcessor(target, model)
 else:
-    st.subheader(f"Blink {st.session_state.blink_goal} times")
-    processor_factory = lambda: BlinkProcessor(
-        st.session_state.blink_goal, eye_mapping, eye_preprocessing
+    blink_goal = st.session_state.blink_goal
+    eye_model = load_eye_model()
+    captured_eye_mapping = eye_mapping
+    captured_eye_preprocessing = eye_preprocessing
+    st.subheader(f"Blink {blink_goal} times")
+    processor_factory = lambda goal=blink_goal, mapping=captured_eye_mapping, prep=captured_eye_preprocessing, model=eye_model: BlinkProcessor(
+        goal, mapping, prep, model
     )
 
 ctx = webrtc_streamer(
@@ -533,7 +556,7 @@ def mission_status():
             st.session_state.mission_complete = True
             st.session_state.alarm_active = False
             st.session_state.mission_key += 1
-            st.success("Mission complete — alarm stopped!")
-            st.balloons()
+            st.session_state.just_completed = True
+            st.rerun()
 
 mission_status()
