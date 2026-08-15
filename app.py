@@ -524,6 +524,13 @@ div[data-testid="stButton"] button[kind="primary"] { background:linear-gradient(
 div[data-testid="stSelectbox"] > div > div, div[data-testid="stNumberInput"] > div > div { border-radius:13px; }
 [data-testid="stAlert"] { border-radius:16px; }
 video { border-radius:22px !important; border:1px solid rgba(255,255,255,.12); box-shadow:0 24px 70px rgba(0,0,0,.35); }
+iframe[title="wakequest_alarm_clock"] { background:transparent !important; border:0 !important; }
+.alarm-summary { margin:.85rem 0 .2rem; padding:.9rem 1rem; border-radius:16px;
+  border:1px solid rgba(115,231,187,.28); background:linear-gradient(120deg,rgba(82,218,166,.13),rgba(102,112,238,.11));
+  box-shadow:0 12px 32px rgba(0,0,0,.18); }
+.alarm-summary small { display:block; color:#8fffc4; font-weight:800; letter-spacing:.13em; text-transform:uppercase; margin-bottom:.25rem; }
+.alarm-summary b { font-family:'Space Grotesk',sans-serif; font-size:1.2rem; color:#f5f7ff; }
+.alarm-summary span { color:#aebbd1; margin-left:.45rem; }
 @media(max-width:800px){
   .block-container{padding-top:4.25rem}
   .mission-grid{grid-template-columns:repeat(2,1fr)}
@@ -591,6 +598,7 @@ with clock_columns[1]:
     action_cols = st.columns(2)
     start_now = action_cols[0].button("Test mission", use_container_width=True)
     arm_alarm = action_cols[1].button("Set alarm", type="primary", use_container_width=True)
+    alarm_summary = st.empty()
 
 display_time = f"{alarm_hour}:{alarm_minute:02d}"
 
@@ -627,6 +635,19 @@ if arm_alarm:
     st.session_state.armed_mission = mission
     st.session_state.armed_difficulty = difficulty
     st.success(f"Alarm armed for {st.session_state.armed_display}")
+
+if st.session_state.get("armed_for"):
+    armed_mission = st.session_state.get("armed_mission", mission)
+    mission_detail = (
+        f" · {st.session_state.get('armed_difficulty', difficulty)}"
+        if armed_mission == "Math Gesture" else ""
+    )
+    alarm_summary.markdown(
+        f'<div class="alarm-summary"><small>Alarm set</small>'
+        f'<b>{st.session_state.get("armed_display", display_time)}</b>'
+        f'<span>{armed_mission}{mission_detail}</span></div>',
+        unsafe_allow_html=True,
+    )
 
 if not st.session_state.alarm_active:
     components.html(
