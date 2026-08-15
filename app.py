@@ -7,6 +7,7 @@ For deployed use, the browser must grant camera and audio permissions.
 from __future__ import annotations
 
 import math
+import os
 import random
 import tempfile
 import threading
@@ -14,6 +15,14 @@ import time
 import wave
 from datetime import datetime
 from pathlib import Path
+
+# MediaPipe imports TensorFlow internally. Keep its native runtime lightweight
+# and deterministic on small cloud containers before either library is loaded.
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
+os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
+os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
+os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import av
 import cv2
