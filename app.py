@@ -541,33 +541,19 @@ left_panel, right_panel = st.columns((0.82, 1.18), gap="large")
 if "alarm_minute" not in st.session_state:
     st.session_state.alarm_minute = 30
 
-
-def adjust_alarm_minute(change):
-    st.session_state.alarm_minute = (st.session_state.alarm_minute + change) % 60
-
 with right_panel:
     st.markdown('<div class="section-label">Alarm time · 12-hour clock</div>', unsafe_allow_html=True)
-    time_cols = st.columns((1, 1, .9))
+    time_cols = st.columns((1.15, .85), gap="medium")
     with time_cols[0]:
         alarm_hour = st.selectbox("Hour", range(1, 13), index=6)
     with time_cols[1]:
-        minute_cols = st.columns((3.6, 1, 1), gap="small", vertical_alignment="bottom")
-        with minute_cols[0]:
-            alarm_minute = st.selectbox(
-                "Minute", range(60), key="alarm_minute",
-                format_func=lambda minute: f"{minute:02d}",
-                help="Scroll through all minutes or use the − and + buttons."
-            )
-        minute_cols[1].button(
-            "−", key="minute_down", help="Previous minute",
-            on_click=adjust_alarm_minute, args=(-1,), use_container_width=True
+        alarm_period = st.segmented_control(
+            "Period", ("AM", "PM"), default="AM", selection_mode="single"
         )
-        minute_cols[2].button(
-            "+", key="minute_up", help="Next minute",
-            on_click=adjust_alarm_minute, args=(1,), use_container_width=True
-        )
-    with time_cols[2]:
-        alarm_period = st.selectbox("Period", ("AM", "PM"))
+    alarm_minute = st.slider(
+        "Minute", min_value=0, max_value=59, key="alarm_minute",
+        format="%02d", help="Drag to any exact minute from 00 to 59."
+    )
 
     mission = st.selectbox("Wake-up mission", mission_names)
     difficulty = st.selectbox("Math difficulty", ("Easy", "Medium", "Hard"),
