@@ -64,10 +64,16 @@ def draw_text(frame, text, y, color=(255, 255, 255), scale=0.65):
 
 
 class MissionProcessor:
-    def __init__(self):
+    def __init__(self, mirror=False):
         self.lock = threading.Lock()
         self.complete = False
         self.status = "Starting camera..."
+        self.mirror = mirror
+
+    def camera_image(self, frame):
+        """Convert a WebRTC frame and optionally mirror it for display/inference."""
+        image = frame.to_ndarray(format="bgr24")
+        return cv2.flip(image, 1) if self.mirror else image
 
     def snapshot(self):
         with self.lock:
@@ -126,8 +132,8 @@ def make_question(difficulty):
 
 
 class MathProcessor(MissionProcessor):
-    def __init__(self, correct_option):
-        super().__init__()
+    def __init__(self, correct_option, mirror=False):
+        super().__init__(mirror)
         self.correct_option = correct_option
         self.hands = mp.solutions.hands.Hands(
             max_num_hands=1, min_detection_confidence=0.65,
@@ -180,7 +186,7 @@ class MathProcessor(MissionProcessor):
         }.get(states)
 
     def recv(self, frame):
-        image = frame.to_ndarray(format="bgr24")
+        image = self.camera_image(frame)
         result = self.hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         choice = None
         if result.multi_hand_landmarks:
@@ -234,15 +240,15 @@ def load_pose_model():
 
 
 class SquatProcessor(MissionProcessor):
-    def __init__(self, goal, model):
-        super().__init__()
+    def __init__(self, goal, model, mirror=False):
+        super().__init__(mirror)
         self.goal = goal
         self.count = 0
         self.phase = "UP"
         self.model = model
 
     def recv(self, frame):
-        image = frame.to_ndarray(format="bgr24")
+        image = self.camera_image(frame)
         result = self.model(image, imgsz=256, conf=0.5, max_det=1, verbose=False)[0]
         knee_angle = None
         if result.keypoints is not None and len(result.keypoints.data):
@@ -285,14 +291,14 @@ def load_object_model():
 
 
 class ObjectProcessor(MissionProcessor):
-    def __init__(self, target, model):
-        super().__init__()
+    def __init__(self, target, model, mirror=False):
+        super().__init__(mirror)
         self.target = target
         self.model = model
         self.stable = 0
 
     def recv(self, frame):
-        image = frame.to_ndarray(format="bgr24")
+        image = self.camera_image(frame)
         result = self.model(image, imgsz=320, conf=0.45, verbose=False)[0]
         detected = []
         if result.boxes is not None:
@@ -325,8 +331,8 @@ def load_eye_model():
 
 
 class BlinkProcessor(MissionProcessor):
-    def __init__(self, goal, score_one_is_open, preprocessing, model):
-        super().__init__()
+    def __init__(self, goal, score_one_is_open, preprocessing, model, mirror=False):
+        super().__init__(mirror)
         self.goal = goal
         self.score_one_is_open = score_one_is_open
         self.preprocessing = preprocessing
@@ -349,7 +355,7 @@ class BlinkProcessor(MissionProcessor):
         return image
 
     def recv(self, frame):
-        image = frame.to_ndarray(format="bgr24")
+        image = self.camera_image(frame)
         if self.model is None:
             self.set_status("Missing models/eye_model.keras")
             return av.VideoFrame.from_ndarray(image, format="bgr24")
@@ -584,6 +590,11 @@ st.markdown(card_html, unsafe_allow_html=True)
 with st.sidebar:
     st.markdown("### ⚙️ Developer settings")
     st.caption("Model compatibility controls for testing.")
+    mirror_camera = st.toggle(
+        "Mirror camera",
+        value=True,
+        help="Flip the camera horizontally so it behaves like a mirror. Changing this restarts the mission camera.",
+    )
     eye_mapping = st.toggle("Eye score ≥ 0.5 means OPEN", value=True,
                             help="Switch this if open eyes are displayed as CLOSED.")
     eye_preprocessing = st.selectbox("Eye-model preprocessing", ("0 to 1", "-1 to 1"),
@@ -631,17 +642,21 @@ if mission == "Math Gesture":
     prompt, choices, correct_option = st.session_state.question
     st.subheader(prompt)
     st.write(" ".join(f"**{i}.** {value}" for i, value in enumerate(choices, 1)))
-    processor_factory = lambda: MathProcessor(correct_option)
+    processor_factory = lambda: MathProcessor(correct_option, mirror_camera)
 elif mission == "Squats":
     squat_goal = st.session_state.squat_goal
     pose_model = load_pose_model()
     st.subheader(f"Complete {squat_goal} squats")
-    processor_factory = lambda goal=squat_goal, model=pose_model: SquatProcessor(goal, model)
+    processor_factory = lambda goal=squat_goal, model=pose_model: SquatProcessor(
+        goal, model, mirror_camera
+    )
 elif mission == "Object Hunt":
     object_target = st.session_state.object_target
     object_model = load_object_model()
     st.subheader(f"Show a {object_target} to the camera")
-    processor_factory = lambda target=object_target, model=object_model: ObjectProcessor(target, model)
+    processor_factory = lambda target=object_target, model=object_model: ObjectProcessor(
+        target, model, mirror_camera
+    )
 else:
     blink_goal = st.session_state.blink_goal
     eye_model = load_eye_model()
@@ -649,11 +664,11 @@ else:
     captured_eye_preprocessing = eye_preprocessing
     st.subheader(f"Blink {blink_goal} times")
     processor_factory = lambda goal=blink_goal, mapping=captured_eye_mapping, prep=captured_eye_preprocessing, model=eye_model: BlinkProcessor(
-        goal, mapping, prep, model
+        goal, mapping, prep, model, mirror_camera
     )
 
 ctx = webrtc_streamer(
-    key=f"wakequest-{mission}-{key}",
+    key=f"wakequest-{mission}-{key}-mirror-{int(mirror_camera)}",
     mode=WebRtcMode.SENDRECV,
     rtc_configuration=RTC_CONFIGURATION,
     media_stream_constraints={
