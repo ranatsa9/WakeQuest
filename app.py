@@ -1,11 +1,8 @@
 """WakeQuest: alarm missions powered by computer vision.
-
 Run with: streamlit run app.py
 For deployed use, the browser must grant camera and audio permissions.
 """
-
 from __future__ import annotations
-
 import math
 import os
 import importlib.util
@@ -19,7 +16,6 @@ import wave
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
-
 # MediaPipe imports TensorFlow internally. Keep its native runtime lightweight
 # and deterministic on small cloud containers before either library is loaded.
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
@@ -27,14 +23,12 @@ os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
 os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
-
 import av
 import cv2
 import numpy as np
 import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_webrtc import RTCConfiguration, WebRtcMode, webrtc_streamer
-
 # MediaPipe 0.10.21's top-level __init__ imports every Tasks module, including
 # optional GenAI code that eagerly initializes TensorFlow. That can crash a
 # small Streamlit Cloud process before the UI appears. Load only the legacy
@@ -48,8 +42,6 @@ mp.__spec__ = _mp_spec
 sys.modules["mediapipe"] = mp
 import mediapipe.python.solutions as _mp_solutions
 mp.solutions = _mp_solutions
-
-
 APP_DIR = Path(__file__).resolve().parent
 APP_TIMEZONE = ZoneInfo("Asia/Riyadh")
 EYE_MODEL_PATH = APP_DIR / "models" / "eye_model.keras"
@@ -65,38 +57,29 @@ alarm_clock_picker = (
 RTC_CONFIGURATION = RTCConfiguration(
     {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
 )
-
-
 def draw_text(frame, text, y, color=(255, 255, 255), scale=0.65):
     cv2.putText(frame, text, (18, y), cv2.FONT_HERSHEY_SIMPLEX, scale,
                 (0, 0, 0), 5, cv2.LINE_AA)
     cv2.putText(frame, text, (18, y), cv2.FONT_HERSHEY_SIMPLEX, scale,
                 color, 2, cv2.LINE_AA)
-
-
 class MissionProcessor:
     def __init__(self):
         self.lock = threading.Lock()
         self.complete = False
         self.status = "Starting camera..."
-
     def snapshot(self):
         with self.lock:
             return self.complete, self.status
-
     def set_status(self, status, complete=None):
         with self.lock:
             self.status = status
             if complete is not None:
                 self.complete = complete
-
-
 class StableValue:
     def __init__(self, frames=10):
         self.frames = frames
         self.value = None
         self.count = 0
-
     def update(self, value):
         if value is None:
             self.value, self.count = None, 0
@@ -106,8 +89,6 @@ class StableValue:
         else:
             self.value, self.count = value, 1
         return value if self.count >= self.frames else None
-
-
 def make_question(difficulty):
     if difficulty == "Easy":
         symbol = random.choice(("+", "-"))
@@ -134,8 +115,6 @@ def make_question(difficulty):
     choices = list(choices)
     random.shuffle(choices)
     return f"{a} {symbol} {b} = ?", choices, choices.index(answer) + 1
-
-
 class MathProcessor(MissionProcessor):
     def __init__(self, correct_option):
         super().__init__()
@@ -149,7 +128,6 @@ class MathProcessor(MissionProcessor):
         self.empty_frames = 0
         self.locked_choice = None
         self.changed_frames = 0
-
     @staticmethod
     def gesture(landmarks):
         # Detect extension from finger geometry instead of screen direction.
@@ -162,13 +140,11 @@ class MathProcessor(MissionProcessor):
             (13, 14, 16), # ring
             (17, 18, 20), # pinky
         )
-
         states = []
         for mcp_i, pip_i, tip_i in finger_joints:
             mcp = np.array((landmarks[mcp_i].x, landmarks[mcp_i].y))
             pip = np.array((landmarks[pip_i].x, landmarks[pip_i].y))
             tip = np.array((landmarks[tip_i].x, landmarks[tip_i].y))
-
             # A raised finger is nearly straight at its PIP joint and its tip
             # is farther from the wrist than the PIP. Both tests are invariant
             # to the hand's rotation in the camera image.
@@ -181,7 +157,6 @@ class MathProcessor(MissionProcessor):
                 np.linalg.norm(tip - wrist) > np.linalg.norm(pip - wrist) * 1.08
             )
             states.append(joint_angle > 155.0 and farther_from_wrist)
-
         states = tuple(states)
         return {
             (True, False, False, False): 1,
@@ -189,7 +164,6 @@ class MathProcessor(MissionProcessor):
             (True, True, True, False): 3,
             (True, True, True, True): 4,
         }.get(states)
-
     def recv(self, frame):
         image = frame.to_ndarray(format="bgr24")
         result = self.hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
@@ -200,7 +174,6 @@ class MathProcessor(MissionProcessor):
                 image, hand, mp.solutions.hands.HAND_CONNECTIONS
             )
             choice = self.gesture(hand.landmark)
-
         if self.locked:
             self.empty_frames = self.empty_frames + 1 if choice is None else 0
             if choice is not None and choice != self.locked_choice:
@@ -224,26 +197,19 @@ class MathProcessor(MissionProcessor):
                     self.set_status(f"Correct! Option {accepted}", True)
                 else:
                     self.set_status(f"Option {accepted} is incorrect. Lower your hand.")
-
         complete, status = self.snapshot()
         draw_text(image, status, 32, (0, 255, 0) if complete else (0, 220, 255))
         return av.VideoFrame.from_ndarray(image, format="bgr24")
-
-
 def angle(a, b, c):
     ba, bc = np.asarray(a) - np.asarray(b), np.asarray(c) - np.asarray(b)
     denominator = np.linalg.norm(ba) * np.linalg.norm(bc)
     if denominator < 1e-6:
         return 180.0
     return math.degrees(math.acos(np.clip(np.dot(ba, bc) / denominator, -1, 1)))
-
-
 @st.cache_resource
 def load_pose_model():
     from ultralytics import YOLO
     return YOLO("yolo11n-pose.pt")
-
-
 class SquatProcessor(MissionProcessor):
     def __init__(self, goal, model):
         super().__init__()
@@ -251,7 +217,6 @@ class SquatProcessor(MissionProcessor):
         self.count = 0
         self.phase = "UP"
         self.model = model
-
     def recv(self, frame):
         image = frame.to_ndarray(format="bgr24")
         result = self.model(image, imgsz=256, conf=0.5, max_det=1, verbose=False)[0]
@@ -278,30 +243,24 @@ class SquatProcessor(MissionProcessor):
                     self.set_status("Squat until your knee angle is below 100 degrees")
         else:
             self.set_status("Show your full body, including ankles")
-
         complete, status = self.snapshot()
         draw_text(image, f"Squats: {self.count}/{self.goal}", 32, (0, 255, 0))
         draw_text(image, status, 64, (0, 255, 0) if complete else (0, 220, 255), 0.55)
         if knee_angle is not None:
             draw_text(image, f"Knee angle: {knee_angle:.0f}", 94, (255, 255, 255), 0.55)
         return av.VideoFrame.from_ndarray(image, format="bgr24")
-
-
 @st.cache_resource
 def load_object_model():
     from ultralytics import YOLO
     if not OBJECT_MODEL_PATH.exists():
         raise FileNotFoundError(f"Missing object model: {OBJECT_MODEL_PATH}")
     return YOLO(str(OBJECT_MODEL_PATH))
-
-
 class ObjectProcessor(MissionProcessor):
     def __init__(self, target, model):
         super().__init__()
         self.target = target
         self.model = model
         self.stable = 0
-
     def recv(self, frame):
         image = frame.to_ndarray(format="bgr24")
         result = self.model(image, imgsz=320, conf=0.45, verbose=False)[0]
@@ -325,16 +284,12 @@ class ObjectProcessor(MissionProcessor):
         complete, status = self.snapshot()
         draw_text(image, status, 32, (0, 255, 0) if complete else (0, 220, 255))
         return av.VideoFrame.from_ndarray(image, format="bgr24")
-
-
 @st.cache_resource
 def load_eye_model():
     if not EYE_MODEL_PATH.exists():
         return None
     import keras
     return keras.models.load_model(EYE_MODEL_PATH, compile=False)
-
-
 class BlinkProcessor(MissionProcessor):
     def __init__(self, goal, score_one_is_open, preprocessing, model):
         super().__init__()
@@ -350,7 +305,6 @@ class BlinkProcessor(MissionProcessor):
         self.open_frames = 0
         self.was_closed = False
         self.blinks = 0
-
     def preprocess(self, crop):
         image = cv2.resize(crop, (224, 224)).astype(np.float32)
         if self.preprocessing == "0 to 1":
@@ -358,7 +312,6 @@ class BlinkProcessor(MissionProcessor):
         else:
             image = image / 127.5 - 1.0
         return image
-
     def recv(self, frame):
         image = frame.to_ndarray(format="bgr24")
         if self.model is None:
@@ -416,8 +369,6 @@ class BlinkProcessor(MissionProcessor):
         if score is not None:
             draw_text(image, f"Model score: {score:.3f}", 62, (255, 255, 255), 0.5)
         return av.VideoFrame.from_ndarray(image, format="bgr24")
-
-
 @st.cache_resource
 def alarm_sound():
     path = Path(tempfile.gettempdir()) / "wakequest_alarm.wav"
@@ -435,8 +386,6 @@ def alarm_sound():
             wav.setframerate(rate)
             wav.writeframes(np.asarray(samples, dtype=np.int16).tobytes())
     return path
-
-
 def initialize_state():
     defaults = {
         "alarm_active": False,
@@ -452,8 +401,6 @@ def initialize_state():
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
-
-
 def begin_mission(mission, difficulty):
     st.session_state.alarm_active = True
     st.session_state.mission_complete = False
@@ -468,8 +415,6 @@ def begin_mission(mission, difficulty):
         st.session_state.object_target = random.choice(list(object_model.names.values()))
     else:
         st.session_state.blink_goal = random.randint(3, 6)
-
-
 st.set_page_config(page_title="WakeQuest · Mission Alarm", page_icon="⏰", layout="wide",
                    initial_sidebar_state="collapsed")
 initialize_state()
@@ -536,6 +481,12 @@ iframe[title*="wakequest_alarm_clock"],
 .alarm-summary small { display:block; color:#8fffc4; font-weight:800; letter-spacing:.13em; text-transform:uppercase; margin-bottom:.25rem; }
 .alarm-summary b { font-family:'Space Grotesk',sans-serif; font-size:1.2rem; color:#f5f7ff; }
 .alarm-summary span { color:#aebbd1; margin-left:.45rem; }
+@media(min-width:700px){
+  .st-key-alarm_layout [data-testid="stHorizontalBlock"] {
+    display:flex !important; flex-direction:row !important; flex-wrap:nowrap !important; align-items:flex-start !important;
+  }
+  .st-key-alarm_layout [data-testid="column"] { min-width:0 !important; }
+}
 @media(max-width:800px){
   .block-container{padding-top:4.25rem}
   .mission-grid{grid-template-columns:repeat(2,1fr)}
@@ -550,21 +501,19 @@ iframe[title*="wakequest_alarm_clock"],
   <div class="wake-sub">Set your wake-up time, choose a live mission, and earn the silence.</div>
 </section>
 """, unsafe_allow_html=True)
-
 if st.session_state.just_completed:
     st.session_state.just_completed = False
     st.success("Mission complete — alarm stopped!")
-
 mission_names = ("Math Gesture", "Squats", "Object Hunt", "Eye Blinks")
-
 if "alarm_minute" not in st.session_state:
     st.session_state.alarm_minute = 30
 if "alarm_hour" not in st.session_state:
     st.session_state.alarm_hour = 7
 if "alarm_period" not in st.session_state:
     st.session_state.alarm_period = "AM"
-
+alarm_layout = st.container(key="alarm_layout")
 alarm_panel, mission_panel = st.columns((.82, 1.18), gap="large")
+alarm_panel, mission_panel = alarm_layout.columns((.82, 1.18), gap="large")
 with alarm_panel:
     st.markdown('<div class="section-label">Alarm time · 12-hour clock</div>', unsafe_allow_html=True)
     if alarm_clock_picker is not None:
@@ -596,7 +545,6 @@ with alarm_panel:
         alarm_minute = st.slider(
             "Minute", min_value=0, max_value=59, key="alarm_minute", format="%02d"
         )
-
 with mission_panel:
     st.markdown('<div class="section-label">Mission setup</div>', unsafe_allow_html=True)
     mission = st.selectbox("Wake-up mission", mission_names)
@@ -606,9 +554,7 @@ with mission_panel:
     start_now = action_cols[0].button("Test mission", use_container_width=True)
     arm_alarm = action_cols[1].button("Set alarm", type="primary", use_container_width=True)
     alarm_summary = st.empty()
-
 display_time = f"{alarm_hour}:{alarm_minute:02d}"
-
 cards = (
     ("Math Gesture", "✋", "Math Gesture", "Solve and answer by hand"),
     ("Squats", "🏋️", "Squat Sprint", "Pose-verified movement"),
@@ -622,7 +568,6 @@ for value, icon, title, description in cards:
                   f'<b>{title}</b><small>{description}</small></div>')
 card_html += "</div>"
 st.markdown(card_html, unsafe_allow_html=True)
-
 with st.sidebar:
     st.markdown("### ⚙️ Developer settings")
     st.caption("Model compatibility controls for testing.")
@@ -630,7 +575,6 @@ with st.sidebar:
                             help="Switch this if open eyes are displayed as CLOSED.")
     eye_preprocessing = st.selectbox("Eye-model preprocessing", ("0 to 1", "-1 to 1"),
                                      help="Use the setting used during model training.")
-
 if start_now:
     begin_mission(mission, difficulty)
 if arm_alarm:
@@ -642,7 +586,6 @@ if arm_alarm:
     st.session_state.armed_mission = mission
     st.session_state.armed_difficulty = difficulty
     st.success(f"Alarm armed for {st.session_state.armed_display}")
-
 if st.session_state.get("armed_for"):
     armed_mission = st.session_state.get("armed_mission", mission)
     mission_detail = (
@@ -655,7 +598,6 @@ if st.session_state.get("armed_for"):
         f'<span>{armed_mission}{mission_detail}</span></div>',
         unsafe_allow_html=True,
     )
-
 if not st.session_state.alarm_active:
     components.html(
         """
@@ -673,7 +615,6 @@ if not st.session_state.alarm_active:
         """,
         height=28,
     )
-
     @st.fragment(run_every=1)
     def alarm_clock():
         now = datetime.now(APP_TIMEZONE).strftime("%H:%M:%S")
@@ -684,7 +625,6 @@ if not st.session_state.alarm_active:
             begin_mission(selected, selected_difficulty)
             st.session_state.armed_for = None
             st.rerun()
-
     alarm_clock()
     st.markdown('<span class="status-chip"><span class="status-dot"></span> SYSTEM READY</span>', unsafe_allow_html=True)
     st.info("Set an alarm or click **Test mission now** to launch the selected challenge.")
@@ -692,11 +632,9 @@ if not st.session_state.alarm_active:
         armed_label = st.session_state.get("armed_display", st.session_state.armed_for)
         st.write(f"Alarm is armed for **{armed_label}**. Keep this page open so the alarm can start.")
     st.stop()
-
 mission = st.session_state.get("active_mission", mission)
 st.audio(str(alarm_sound()), autoplay=True, loop=True)
 st.warning("Alarm active — complete the selected mission to stop it.")
-
 key = str(st.session_state.mission_key)
 if mission == "Math Gesture":
     prompt, choices, correct_option = st.session_state.question
@@ -722,7 +660,6 @@ else:
     processor_factory = lambda goal=blink_goal, mapping=captured_eye_mapping, prep=captured_eye_preprocessing, model=eye_model: BlinkProcessor(
         goal, mapping, prep, model
     )
-
 ctx = webrtc_streamer(
     key=f"wakequest-{mission}-{key}",
     mode=WebRtcMode.SENDRECV,
@@ -740,7 +677,6 @@ ctx = webrtc_streamer(
     video_processor_factory=processor_factory,
     async_processing=True,
 )
-
 @st.fragment(run_every=1)
 def mission_status():
     if ctx.video_processor:
@@ -752,5 +688,4 @@ def mission_status():
             st.session_state.mission_key += 1
             st.session_state.just_completed = True
             st.rerun()
-
 mission_status()
