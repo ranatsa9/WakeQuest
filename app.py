@@ -530,25 +530,6 @@ iframe[title*="wakequest_alarm_clock"],
 [data-testid="stCustomComponentV1"] iframe {
   background:none !important; background-color:transparent !important; border:0 !important;
 }
-.alarm-summary { margin:.85rem 0 .2rem; padding:.9rem 1rem; border-radius:16px;
-  border:1px solid rgba(115,231,187,.28); background:linear-gradient(120deg,rgba(82,218,166,.13),rgba(102,112,238,.11));
-  box-shadow:0 12px 32px rgba(0,0,0,.18); }
-.alarm-summary small { display:block; color:#8fffc4; font-weight:800; letter-spacing:.13em; text-transform:uppercase; margin-bottom:.25rem; }
-.alarm-summary b { font-family:'Space Grotesk',sans-serif; font-size:1.2rem; color:#f5f7ff; }
-.alarm-summary span { color:#aebbd1; margin-left:.45rem; }
-@media(min-width:700px){
-  .st-key-alarm_layout [data-testid="stHorizontalBlock"],
-  [data-testid="stHorizontalBlock"]:has(iframe[title*="wakequest_alarm_clock"]) {
-    display:flex !important; flex-direction:row !important; flex-wrap:nowrap !important; align-items:flex-start !important;
-  }
-  .st-key-alarm_layout [data-testid="stColumn"] { min-width:0 !important; }
-  [data-testid="stHorizontalBlock"]:has(iframe[title*="wakequest_alarm_clock"]) > [data-testid="stColumn"]:first-child {
-    width:calc(41% - .6rem) !important; flex:0 0 calc(41% - .6rem) !important;
-  }
-  [data-testid="stHorizontalBlock"]:has(iframe[title*="wakequest_alarm_clock"]) > [data-testid="stColumn"]:last-child {
-    width:calc(59% - .6rem) !important; flex:0 0 calc(59% - .6rem) !important;
-  }
-}
 @media(max-width:800px){
   .block-container{padding-top:4.25rem}
   .mission-grid{grid-template-columns:repeat(2,1fr)}
@@ -569,6 +550,7 @@ if st.session_state.just_completed:
     st.success("Mission complete — alarm stopped!")
 
 mission_names = ("Math Gesture", "Squats", "Object Hunt", "Eye Blinks")
+left_panel, right_panel = st.columns((0.82, 1.18), gap="large")
 
 if "alarm_minute" not in st.session_state:
     st.session_state.alarm_minute = 30
@@ -576,11 +558,7 @@ if "alarm_hour" not in st.session_state:
     st.session_state.alarm_hour = 7
 if "alarm_period" not in st.session_state:
     st.session_state.alarm_period = "AM"
-
-alarm_layout = st.container(key="alarm_layout")
-alarm_panel, mission_panel = alarm_layout.columns((.82, 1.18), gap="large")
-with alarm_panel:
-    st.markdown('<div class="section-label">Alarm time · 12-hour clock</div>', unsafe_allow_html=True)
+with left_panel:
     if alarm_clock_picker is not None:
         picker_value = alarm_clock_picker(
             hour=st.session_state.alarm_hour,
@@ -597,21 +575,14 @@ with alarm_panel:
             st.session_state.alarm_hour = int(picker_value.get("hour", 7))
             st.session_state.alarm_minute = int(picker_value.get("minute", 30))
             st.session_state.alarm_period = picker_value.get("period", "AM")
-        alarm_hour = st.session_state.alarm_hour
-        alarm_minute = st.session_state.alarm_minute
-        alarm_period = st.session_state.alarm_period
     else:
-        st.warning("Clock picker files are missing. Upload the clock_picker folder to enable the dial.")
-        fallback_cols = st.columns((1.15, .85), gap="medium")
-        alarm_hour = fallback_cols[0].selectbox("Hour", range(1, 13), key="alarm_hour")
-        alarm_period = fallback_cols[1].segmented_control(
-            "Period", ("AM", "PM"), key="alarm_period", selection_mode="single"
-        )
-        alarm_minute = st.slider(
-            "Minute", min_value=0, max_value=59, key="alarm_minute", format="%02d"
-        )
+        st.warning("Upload the clock_picker folder to enable the clickable clock.")
 
-with mission_panel:
+alarm_hour = st.session_state.alarm_hour
+alarm_minute = st.session_state.alarm_minute
+alarm_period = st.session_state.alarm_period
+
+with right_panel:
     st.markdown('<div class="section-label">Mission setup</div>', unsafe_allow_html=True)
     mission = st.selectbox("Wake-up mission", mission_names)
     difficulty = st.selectbox("Math difficulty", ("Easy", "Medium", "Hard"),
@@ -619,7 +590,6 @@ with mission_panel:
     action_cols = st.columns(2)
     start_now = action_cols[0].button("Test mission", use_container_width=True)
     arm_alarm = action_cols[1].button("Set alarm", type="primary", use_container_width=True)
-    alarm_summary = st.empty()
 
 display_time = f"{alarm_hour}:{alarm_minute:02d}"
 
@@ -656,19 +626,6 @@ if arm_alarm:
     st.session_state.armed_mission = mission
     st.session_state.armed_difficulty = difficulty
     st.success(f"Alarm armed for {st.session_state.armed_display}")
-
-if st.session_state.get("armed_for"):
-    armed_mission = st.session_state.get("armed_mission", mission)
-    mission_detail = (
-        f" · {st.session_state.get('armed_difficulty', difficulty)}"
-        if armed_mission == "Math Gesture" else ""
-    )
-    alarm_summary.markdown(
-        f'<div class="alarm-summary"><small>Alarm set</small>'
-        f'<b>{st.session_state.get("armed_display", display_time)}</b>'
-        f'<span>{armed_mission}{mission_detail}</span></div>',
-        unsafe_allow_html=True,
-    )
 
 if not st.session_state.alarm_active:
     components.html(
