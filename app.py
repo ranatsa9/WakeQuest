@@ -57,7 +57,7 @@ OBJECT_MODEL_PATH = APP_DIR / "models" / "best.pt"
 CLOCK_PICKER_DIR = APP_DIR / "clock_picker"
 alarm_clock_picker = (
     components.declare_component(
-        "wakequest_alarm_clock", path=str(CLOCK_PICKER_DIR)
+        "wakequest_alarm_clock_v2", path=str(CLOCK_PICKER_DIR)
     )
     if CLOCK_PICKER_DIR.is_dir()
     else None
@@ -569,7 +569,7 @@ with left_panel:
                 "minute": st.session_state.alarm_minute,
                 "period": st.session_state.alarm_period,
             },
-            key="alarm_clock_picker",
+            key="alarm_clock_picker_v2",
         )
         if picker_value:
             st.session_state.alarm_hour = int(picker_value.get("hour", 7))
