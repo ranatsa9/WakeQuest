@@ -17,31 +17,12 @@
       box-shadow: inset 0 0 62px rgba(115,82,210,.24), 0 18px 52px rgba(0,0,0,.34),0 0 45px rgba(166,112,255,.18);
       user-select: none; touch-action: none;
     }
-    .dial::before,.dial::after{content:"";position:absolute;border-radius:50%;pointer-events:none;z-index:-1}
-    .dial::before{inset:-22px;border:1px solid rgba(178,135,255,.23);box-shadow:0 0 32px rgba(119,102,255,.11)}
-    .dial::after{inset:-45px;border:1px dashed rgba(105,218,255,.16);animation:orbit-spin 34s linear infinite}
-    .orbit-dot{position:absolute;width:9px;height:9px;border-radius:50%;pointer-events:none;z-index:3;
-      background:#8fe8ff;box-shadow:0 0 14px currentColor,0 0 28px currentColor}
-    .orbit-dot.one{top:-27px;left:24%;color:#8fe8ff}
-    .orbit-dot.two{right:-30px;top:62%;color:#d99cff;background:#d99cff;width:7px;height:7px}
-    .orbit-dot.three{bottom:-26px;left:66%;color:#ad91ff;background:#ad91ff;width:6px;height:6px}
-    .orbit-dot.four{left:-31px;top:32%;color:#79dfff;background:#79dfff;width:5px;height:5px}
-    @keyframes orbit-spin{to{transform:rotate(360deg)}}
     .live-strip{width:100%;display:flex;align-items:center;justify-content:space-between;padding:9px 12px;
       border-top:1px solid rgba(255,255,255,.07);border-bottom:1px solid rgba(255,255,255,.07);
       color:#aaa4bb;font-size:12px;letter-spacing:.04em}
     .live-strip b{color:#d8e8ff;font-size:13px}.live-label{display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:.12em;font-size:10px;font-weight:800}
     .live-dot{width:7px;height:7px;border-radius:50%;background:#72f5b0;box-shadow:0 0 12px #72f5b0}
-    .dial-stage{position:relative;width:100%;display:flex;align-items:center;justify-content:center;padding:38px 0;isolation:isolate}
-    .dial-stage::before{content:"";position:absolute;left:0;right:0;top:50%;height:150px;transform:translateY(-50%);z-index:-2;
-      background:
-        repeating-linear-gradient(0deg,transparent 0 27px,rgba(119,216,255,.18) 28px 30px),
-        linear-gradient(90deg,transparent 0 3%,rgba(173,127,255,.30) 3% 18%,rgba(107,220,255,.22) 18% 82%,rgba(173,127,255,.30) 82% 97%,transparent 97%);
-      -webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
-    .dial-stage::after{content:"";position:absolute;left:3%;right:3%;top:50%;height:2px;background:linear-gradient(90deg,transparent,#7ae6ff,#c28cff,#7ae6ff,transparent);
-      box-shadow:0 -55px 0 rgba(183,139,255,.18),0 55px 0 rgba(104,220,255,.15),0 0 20px rgba(132,174,255,.42);z-index:-1}
-    .wing-label{position:absolute;top:50%;transform:translateY(-50%);font-size:10px;font-weight:900;letter-spacing:.22em;color:rgba(199,220,255,.56);writing-mode:vertical-rl}
-    .wing-label.left{left:4%}.wing-label.right{right:4%;transform:translateY(-50%) rotate(180deg)}
+    .dial-stage{position:relative;width:100%;display:flex;align-items:center;justify-content:center;padding:0}
     .tick { position:absolute; left:50%; top:50%; width:44px; height:44px; margin:-22px;
       display:grid; place-items:center; border-radius:50%; font-size:17px; font-weight:750;
       color: #bdb7d2; pointer-events: none; transition: .16s ease; }
@@ -61,21 +42,13 @@
       font:700 13px inherit; cursor:pointer; }
     button.active { color:white; background:linear-gradient(135deg,#3eaccd,#7659df); box-shadow:0 7px 18px #4932a04d; }
     .hint { color:#8f899f; font-size:12px; line-height:1.45; margin-top:11px; }
-    .quick-label{margin:15px 0 7px;color:#918aa6;font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
-    .presets{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
-    .preset{padding:8px 5px;border:1px solid rgba(183,145,255,.22);background:rgba(255,255,255,.035);color:#c9c1db;border-radius:10px;font-size:12px}
-    .preset:hover{border-color:#9fdfff;background:rgba(109,191,255,.10);color:white}
-    @media(max-width:560px){ body{padding:4px}.picker{padding:14px 8px}.dial-stage{padding:24px 0}.dial{width:min(300px,88vw)}.hand{height:92px}.time{font-size:42px}.tick{font-size:13px}.wing-label{display:none} }
+    @media(max-width:560px){ body{padding:4px}.picker{padding:14px 8px}.dial{width:min(300px,88vw)}.hand{height:92px}.time{font-size:42px}.tick{font-size:13px} }
   </style>
 </head>
 <body>
   <div class="picker">
-    <div class="live-strip"><span class="live-label"><i class="live-dot"></i>Local time</span><b id="liveTime">--:--:--</b></div>
     <div class="dial-stage">
-      <span class="wing-label left">WAKE</span><span class="wing-label right">QUEST</span>
       <div class="dial" id="dial">
-        <i class="orbit-dot one"></i><i class="orbit-dot two"></i>
-        <i class="orbit-dot three"></i><i class="orbit-dot four"></i>
         <div class="hand" id="hand"></div><div class="pin"></div>
       </div>
     </div>
@@ -85,14 +58,8 @@
       <div class="switch"><button id="hourMode" class="active">Hour</button><button id="minuteMode">Minute</button></div>
       <div class="switch"><button id="amButton" class="active">AM</button><button id="pmButton">PM</button></div>
       <div class="hint" id="hint">Click a number on the clock to choose the hour.</div>
-      <div class="quick-label">Quick set</div>
-      <div class="presets">
-        <button class="preset" data-hour="6" data-minute="30">6:30 AM</button>
-        <button class="preset" data-hour="7" data-minute="0">7:00 AM</button>
-        <button class="preset" data-hour="7" data-minute="30">7:30 AM</button>
-        <button class="preset" data-hour="8" data-minute="0">8:00 AM</button>
-      </div>
     </div>
+    <div class="live-strip"><span class="live-label"><i class="live-dot"></i>Current time</span><b id="liveTime">--:--:--</b></div>
   </div>
   <script>
     let state = {hour:7, minute:30, period:"AM"};
@@ -141,10 +108,6 @@
     dial.addEventListener("pointerdown",choose);
     hourMode.onclick=()=>{mode="hour";render()}; minuteMode.onclick=()=>{mode="minute";render()};
     amButton.onclick=()=>{state.period="AM";render();setValue()}; pmButton.onclick=()=>{state.period="PM";render();setValue()};
-    document.querySelectorAll(".preset").forEach(button=>button.onclick=()=>{
-      state.hour=Number(button.dataset.hour); state.minute=Number(button.dataset.minute); state.period="AM";
-      mode="hour"; render(); setValue();
-    });
     function updateLiveTime(){
       document.getElementById("liveTime").textContent=new Date().toLocaleTimeString([],{
         hour:"numeric",minute:"2-digit",second:"2-digit",hour12:true
