@@ -11,12 +11,22 @@
     .picker { width:100%; display:flex; flex-direction:column; gap:17px; align-items:center; padding:14px 0 12px;
       border:0; border-radius:0; background:transparent; box-shadow:none; backdrop-filter:none; }
     .dial {
-      position:relative; width:min(540px,100%); aspect-ratio:1; height:auto; border-radius:50%; cursor:pointer;
+      position:relative; isolation:isolate; z-index:1; width:min(540px,100%); aspect-ratio:1; height:auto; border-radius:50%; cursor:pointer;
       background: radial-gradient(circle at 48% 38%, #342956 0 46%, #151127 73%);
       border: 2px solid rgba(195,153,255,.62);
       box-shadow: inset 0 0 62px rgba(115,82,210,.24), 0 18px 52px rgba(0,0,0,.34),0 0 45px rgba(166,112,255,.18);
       user-select: none; touch-action: none;
     }
+    .dial::before,.dial::after{content:"";position:absolute;border-radius:50%;pointer-events:none;z-index:-1}
+    .dial::before{inset:-22px;border:1px solid rgba(178,135,255,.23);box-shadow:0 0 32px rgba(119,102,255,.11)}
+    .dial::after{inset:-45px;border:1px dashed rgba(105,218,255,.16);animation:orbit-spin 34s linear infinite}
+    .orbit-dot{position:absolute;width:9px;height:9px;border-radius:50%;pointer-events:none;z-index:3;
+      background:#8fe8ff;box-shadow:0 0 14px currentColor,0 0 28px currentColor}
+    .orbit-dot.one{top:-27px;left:24%;color:#8fe8ff}
+    .orbit-dot.two{right:-30px;top:62%;color:#d99cff;background:#d99cff;width:7px;height:7px}
+    .orbit-dot.three{bottom:-26px;left:66%;color:#ad91ff;background:#ad91ff;width:6px;height:6px}
+    .orbit-dot.four{left:-31px;top:32%;color:#79dfff;background:#79dfff;width:5px;height:5px}
+    @keyframes orbit-spin{to{transform:rotate(360deg)}}
     .tick { position:absolute; left:50%; top:50%; width:44px; height:44px; margin:-22px;
       display:grid; place-items:center; border-radius:50%; font-size:17px; font-weight:750;
       color: #bdb7d2; pointer-events: none; transition: .16s ease; }
@@ -41,7 +51,11 @@
 </head>
 <body>
   <div class="picker">
-    <div class="dial" id="dial"><div class="hand" id="hand"></div><div class="pin"></div></div>
+    <div class="dial" id="dial">
+      <i class="orbit-dot one"></i><i class="orbit-dot two"></i>
+      <i class="orbit-dot three"></i><i class="orbit-dot four"></i>
+      <div class="hand" id="hand"></div><div class="pin"></div>
+    </div>
     <div class="panel">
       <div class="eyebrow">Your alarm</div>
       <div class="time"><b id="hourText">7</b>:<b id="minuteText">30</b><span id="periodText">AM</span></div>
