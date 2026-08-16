@@ -537,10 +537,17 @@ iframe[title*="wakequest_alarm_clock"],
 .alarm-summary b { font-family:'Space Grotesk',sans-serif; font-size:1.2rem; color:#f5f7ff; }
 .alarm-summary span { color:#aebbd1; margin-left:.45rem; }
 @media(min-width:700px){
-  .st-key-alarm_layout [data-testid="stHorizontalBlock"] {
+  .st-key-alarm_layout [data-testid="stHorizontalBlock"],
+  [data-testid="stHorizontalBlock"]:has(iframe[title*="wakequest_alarm_clock"]) {
     display:flex !important; flex-direction:row !important; flex-wrap:nowrap !important; align-items:flex-start !important;
   }
-  .st-key-alarm_layout [data-testid="column"] { min-width:0 !important; }
+  .st-key-alarm_layout [data-testid="stColumn"] { min-width:0 !important; }
+  [data-testid="stHorizontalBlock"]:has(iframe[title*="wakequest_alarm_clock"]) > [data-testid="stColumn"]:first-child {
+    width:calc(41% - .6rem) !important; flex:0 0 calc(41% - .6rem) !important;
+  }
+  [data-testid="stHorizontalBlock"]:has(iframe[title*="wakequest_alarm_clock"]) > [data-testid="stColumn"]:last-child {
+    width:calc(59% - .6rem) !important; flex:0 0 calc(59% - .6rem) !important;
+  }
 }
 @media(max-width:800px){
   .block-container{padding-top:4.25rem}
