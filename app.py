@@ -524,6 +524,16 @@ div[data-testid="stButton"] button[kind="primary"] { background:linear-gradient(
 div[data-testid="stSelectbox"] > div > div, div[data-testid="stNumberInput"] > div > div { border-radius:13px; }
 [data-testid="stAlert"] { border-radius:16px; }
 video { border-radius:22px !important; border:1px solid rgba(255,255,255,.12); box-shadow:0 24px 70px rgba(0,0,0,.35); }
+.alarm-preview { margin-top:1rem; padding:1.05rem 1.15rem; border-radius:18px; border:1px solid rgba(173,135,255,.22);
+  background:linear-gradient(135deg,rgba(145,101,255,.12),rgba(77,188,230,.06)); box-shadow:0 16px 42px rgba(0,0,0,.20); }
+.alarm-preview.armed { border-color:rgba(104,244,173,.34); background:linear-gradient(135deg,rgba(57,201,137,.16),rgba(66,122,222,.08)); }
+.preview-kicker { color:#a9a1c7; font-size:.65rem; font-weight:800; letter-spacing:.15em; text-transform:uppercase; }
+.alarm-preview.armed .preview-kicker { color:#83f3b8; }
+.preview-time { margin:.28rem 0 .18rem; font:700 2rem/1 'Space Grotesk',sans-serif; letter-spacing:-.045em; }
+.preview-detail { color:#aebbd1; font-size:.87rem; }
+.preview-steps { display:grid; grid-template-columns:repeat(3,1fr); gap:.45rem; margin-top:.9rem; }
+.preview-step { padding:.55rem .35rem; text-align:center; border-radius:10px; background:rgba(255,255,255,.045); color:#aaa5ba; font-size:.72rem; }
+.preview-step b { display:block; color:#e8e5f4; font-size:.78rem; margin-bottom:.08rem; }
 iframe[title*="wakequest_alarm_clock"],
 [data-testid="stCustomComponentV1"],
 [data-testid="stCustomComponentV1"] > div,
@@ -590,6 +600,7 @@ with right_panel:
     action_cols = st.columns(2)
     start_now = action_cols[0].button("Test mission", use_container_width=True)
     arm_alarm = action_cols[1].button("Set alarm", type="primary", use_container_width=True)
+    alarm_preview = st.empty()
 
 display_time = f"{alarm_hour}:{alarm_minute:02d}"
 
@@ -625,7 +636,26 @@ if arm_alarm:
     st.session_state.armed_display = f"{display_time} {alarm_period}"
     st.session_state.armed_mission = mission
     st.session_state.armed_difficulty = difficulty
-    st.success(f"Alarm armed for {st.session_state.armed_display}")
+
+preview_armed = bool(st.session_state.get("armed_for"))
+preview_time = st.session_state.get("armed_display", f"{display_time} {alarm_period}") if preview_armed else f"{display_time} {alarm_period}"
+preview_mission = st.session_state.get("armed_mission", mission) if preview_armed else mission
+preview_difficulty = st.session_state.get("armed_difficulty", difficulty) if preview_armed else difficulty
+preview_extra = f" · {preview_difficulty}" if preview_mission == "Math Gesture" else ""
+preview_state_class = " armed" if preview_armed else ""
+preview_label = "Alarm scheduled" if preview_armed else "Alarm preview"
+alarm_preview.markdown(
+    f'<div class="alarm-preview{preview_state_class}">'
+    f'<div class="preview-kicker">{preview_label}</div>'
+    f'<div class="preview-time">{preview_time}</div>'
+    f'<div class="preview-detail">{preview_mission}{preview_extra} · Camera ready</div>'
+    '<div class="preview-steps">'
+    '<div class="preview-step"><b>1 · Set</b>Choose a time</div>'
+    '<div class="preview-step"><b>2 · Wake</b>Hear the alarm</div>'
+    '<div class="preview-step"><b>3 · Prove</b>Finish the mission</div>'
+    '</div></div>',
+    unsafe_allow_html=True,
+)
 
 if not st.session_state.alarm_active:
     components.html(
