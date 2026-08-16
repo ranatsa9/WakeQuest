@@ -569,12 +569,6 @@ if "difficulty_choice" not in st.session_state:
     st.session_state.difficulty_choice = "Easy"
 
 
-def choose_mission(name):
-    st.session_state.mission_choice = name
-
-
-def choose_difficulty(level):
-    st.session_state.difficulty_choice = level
 with left_panel:
     if alarm_clock_picker is not None:
         picker_value = alarm_clock_picker(
@@ -610,14 +604,15 @@ with right_panel:
     }
     mission_button_cols = st.columns(2)
     for index, option in enumerate(mission_names):
-        mission_button_cols[index % 2].button(
+        mission_clicked = mission_button_cols[index % 2].button(
             f"{mission_icons[option]}  {option}",
             key=f"choose_{option}",
             type="primary" if st.session_state.mission_choice == option else "secondary",
-            on_click=choose_mission,
-            args=(option,),
             use_container_width=True,
         )
+        if mission_clicked:
+            st.session_state.mission_choice = option
+            st.rerun()
     mission = st.session_state.mission_choice
     st.markdown(
         f'<div class="mission-selection"><small>Selected mission</small>'
@@ -629,15 +624,16 @@ with right_panel:
     st.markdown('<div class="section-label">Math difficulty</div>', unsafe_allow_html=True)
     difficulty_cols = st.columns(3)
     for index, level in enumerate(("Easy", "Medium", "Hard")):
-        difficulty_cols[index].button(
+        difficulty_clicked = difficulty_cols[index].button(
             level,
             key=f"difficulty_{level}",
             type="primary" if st.session_state.difficulty_choice == level else "secondary",
             disabled=mission != "Math Gesture",
-            on_click=choose_difficulty,
-            args=(level,),
             use_container_width=True,
         )
+        if difficulty_clicked:
+            st.session_state.difficulty_choice = level
+            st.rerun()
     difficulty = st.session_state.difficulty_choice
     action_cols = st.columns(2)
     start_now = action_cols[0].button("Test mission", use_container_width=True)
