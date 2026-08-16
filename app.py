@@ -564,8 +564,8 @@ if "alarm_hour" not in st.session_state:
 if "alarm_period" not in st.session_state:
     st.session_state.alarm_period = "AM"
 
-clock_columns = st.columns((.42, 2.16, .42))
-with clock_columns[1]:
+alarm_panel, mission_panel = st.columns((1.18, .82), gap="large")
+with alarm_panel:
     st.markdown('<div class="section-label">Alarm time · 12-hour clock</div>', unsafe_allow_html=True)
     if alarm_clock_picker is not None:
         picker_value = alarm_clock_picker(
@@ -597,6 +597,8 @@ with clock_columns[1]:
             "Minute", min_value=0, max_value=59, key="alarm_minute", format="%02d"
         )
 
+with mission_panel:
+    st.markdown('<div class="section-label">Mission setup</div>', unsafe_allow_html=True)
     mission = st.selectbox("Wake-up mission", mission_names)
     difficulty = st.selectbox("Math difficulty", ("Easy", "Medium", "Hard"),
                               disabled=mission != "Math Gesture")
