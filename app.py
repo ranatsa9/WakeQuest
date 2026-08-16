@@ -529,6 +529,14 @@ video { border-radius:22px !important; border:1px solid rgba(255,255,255,.12); b
 .mission-selection small { display:block; color:#8ddfff; font-weight:800; letter-spacing:.12em; text-transform:uppercase; margin-bottom:.25rem; }
 .mission-selection b { display:block; font:700 1.05rem 'Space Grotesk',sans-serif; margin-bottom:.18rem; }
 .mission-selection span { color:#a8b3c8; font-size:.82rem; }
+.armed-banner { margin-top:1rem; padding:1rem 1.1rem; display:flex; align-items:center; gap:.85rem; border-radius:16px;
+  border:1px solid rgba(103,242,170,.34); background:linear-gradient(120deg,rgba(52,198,132,.16),rgba(73,114,216,.08));
+  box-shadow:0 14px 38px rgba(0,0,0,.20); }
+.armed-check { width:34px; height:34px; display:grid; place-items:center; flex:0 0 34px; border-radius:50%;
+  color:#0c1b16; background:#79f0b1; box-shadow:0 0 20px rgba(105,241,174,.38); font-weight:900; }
+.armed-copy small { display:block; color:#84f4ba; font-size:.65rem; font-weight:900; letter-spacing:.14em; text-transform:uppercase; }
+.armed-copy b { display:block; margin:.12rem 0; font:700 1.2rem 'Space Grotesk',sans-serif; }
+.armed-copy span { color:#aebbd1; font-size:.82rem; }
 iframe[title*="wakequest_alarm_clock"],
 [data-testid="stCustomComponentV1"],
 [data-testid="stCustomComponentV1"] > div,
@@ -638,6 +646,7 @@ with right_panel:
     action_cols = st.columns(2)
     start_now = action_cols[0].button("Test mission", use_container_width=True)
     arm_alarm = action_cols[1].button("Set alarm", type="primary", use_container_width=True)
+    armed_confirmation = st.empty()
 
 display_time = f"{alarm_hour}:{alarm_minute:02d}"
 
@@ -673,6 +682,21 @@ if arm_alarm:
     st.session_state.armed_display = f"{display_time} {alarm_period}"
     st.session_state.armed_mission = mission
     st.session_state.armed_difficulty = difficulty
+
+if st.session_state.get("armed_for"):
+    confirmed_mission = st.session_state.get("armed_mission", mission)
+    confirmed_detail = (
+        f" · {st.session_state.get('armed_difficulty', difficulty)}"
+        if confirmed_mission == "Math Gesture" else ""
+    )
+    armed_confirmation.markdown(
+        '<div class="armed-banner"><div class="armed-check">✓</div><div class="armed-copy">'
+        '<small>Alarm is set</small>'
+        f'<b>{st.session_state.get("armed_display", display_time)}</b>'
+        f'<span>{confirmed_mission}{confirmed_detail} · Keep this page open</span>'
+        '</div></div>',
+        unsafe_allow_html=True,
+    )
 
 if not st.session_state.alarm_active:
     components.html(
