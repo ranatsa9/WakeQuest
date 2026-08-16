@@ -564,7 +564,7 @@ if "alarm_hour" not in st.session_state:
 if "alarm_period" not in st.session_state:
     st.session_state.alarm_period = "AM"
 
-alarm_panel, mission_panel = st.columns((1.18, .82), gap="large")
+alarm_panel, mission_panel = st.columns((.82, 1.18), gap="large")
 with alarm_panel:
     st.markdown('<div class="section-label">Alarm time · 12-hour clock</div>', unsafe_allow_html=True)
     if alarm_clock_picker is not None:
