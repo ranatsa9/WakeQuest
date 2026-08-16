@@ -54,14 +54,6 @@ APP_DIR = Path(__file__).resolve().parent
 APP_TIMEZONE = ZoneInfo("Asia/Riyadh")
 EYE_MODEL_PATH = APP_DIR / "models" / "eye_model.keras"
 OBJECT_MODEL_PATH = APP_DIR / "models" / "best.pt"
-CLOCK_PICKER_DIR = APP_DIR / "clock_picker"
-alarm_clock_picker = (
-    components.declare_component(
-        "wakequest_alarm_clock", path=str(CLOCK_PICKER_DIR)
-    )
-    if CLOCK_PICKER_DIR.is_dir()
-    else None
-)
 RTC_CONFIGURATION = RTCConfiguration(
     {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
 )
@@ -524,12 +516,6 @@ div[data-testid="stButton"] button[kind="primary"] { background:linear-gradient(
 div[data-testid="stSelectbox"] > div > div, div[data-testid="stNumberInput"] > div > div { border-radius:13px; }
 [data-testid="stAlert"] { border-radius:16px; }
 video { border-radius:22px !important; border:1px solid rgba(255,255,255,.12); box-shadow:0 24px 70px rgba(0,0,0,.35); }
-iframe[title*="wakequest_alarm_clock"],
-[data-testid="stCustomComponentV1"],
-[data-testid="stCustomComponentV1"] > div,
-[data-testid="stCustomComponentV1"] iframe {
-  background:none !important; background-color:transparent !important; border:0 !important;
-}
 @media(max-width:800px){
   .block-container{padding-top:4.25rem}
   .mission-grid{grid-template-columns:repeat(2,1fr)}
@@ -554,36 +540,35 @@ left_panel, right_panel = st.columns((0.82, 1.18), gap="large")
 
 if "alarm_minute" not in st.session_state:
     st.session_state.alarm_minute = 30
-if "alarm_hour" not in st.session_state:
-    st.session_state.alarm_hour = 7
-if "alarm_period" not in st.session_state:
-    st.session_state.alarm_period = "AM"
-with left_panel:
-    if alarm_clock_picker is not None:
-        picker_value = alarm_clock_picker(
-            hour=st.session_state.alarm_hour,
-            minute=st.session_state.alarm_minute,
-            period=st.session_state.alarm_period,
-            default={
-                "hour": st.session_state.alarm_hour,
-                "minute": st.session_state.alarm_minute,
-                "period": st.session_state.alarm_period,
-            },
-            key="alarm_clock_picker",
-        )
-        if picker_value:
-            st.session_state.alarm_hour = int(picker_value.get("hour", 7))
-            st.session_state.alarm_minute = int(picker_value.get("minute", 30))
-            st.session_state.alarm_period = picker_value.get("period", "AM")
-    else:
-        st.warning("Upload the clock_picker folder to enable the clickable clock.")
 
-alarm_hour = st.session_state.alarm_hour
-alarm_minute = st.session_state.alarm_minute
-alarm_period = st.session_state.alarm_period
+
+def adjust_alarm_minute(change):
+    st.session_state.alarm_minute = (st.session_state.alarm_minute + change) % 60
 
 with right_panel:
-    st.markdown('<div class="section-label">Mission setup</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Alarm time · 12-hour clock</div>', unsafe_allow_html=True)
+    time_cols = st.columns((1, 1, .9))
+    with time_cols[0]:
+        alarm_hour = st.selectbox("Hour", range(1, 13), index=6)
+    with time_cols[1]:
+        minute_cols = st.columns((3.6, 1, 1), gap="small", vertical_alignment="bottom")
+        with minute_cols[0]:
+            alarm_minute = st.selectbox(
+                "Minute", range(60), key="alarm_minute",
+                format_func=lambda minute: f"{minute:02d}",
+                help="Scroll through all minutes or use the − and + buttons."
+            )
+        minute_cols[1].button(
+            "−", key="minute_down", help="Previous minute",
+            on_click=adjust_alarm_minute, args=(-1,), use_container_width=True
+        )
+        minute_cols[2].button(
+            "+", key="minute_up", help="Next minute",
+            on_click=adjust_alarm_minute, args=(1,), use_container_width=True
+        )
+    with time_cols[2]:
+        alarm_period = st.selectbox("Period", ("AM", "PM"))
+
     mission = st.selectbox("Wake-up mission", mission_names)
     difficulty = st.selectbox("Math difficulty", ("Easy", "Medium", "Hard"),
                               disabled=mission != "Math Gesture")
@@ -592,6 +577,16 @@ with right_panel:
     arm_alarm = action_cols[1].button("Set alarm", type="primary", use_container_width=True)
 
 display_time = f"{alarm_hour}:{alarm_minute:02d}"
+with left_panel:
+    st.markdown(f"""
+    <div class="alarm-stage">
+      <div class="clock-shell"><div class="clock-face">
+        <div class="clock-label">Your alarm</div>
+        <div class="clock-time">{display_time}<small>{alarm_period}</small></div>
+        <div class="clock-note">Mission required to dismiss</div>
+      </div></div>
+    </div>
+    """, unsafe_allow_html=True)
 
 cards = (
     ("Math Gesture", "✋", "Math Gesture", "Solve and answer by hand"),
